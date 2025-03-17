@@ -1,11 +1,143 @@
 <template>
   <!-- 차트를 렌더링할 요소 -->
-  <div ref="chartDom" style="width: 100%; height: 500px"></div>
+  <div>
+    <h2>토큰 트랜잭션 기반 OHLC 차트</h2>
+    <!-- 토큰 주소 입력 -->
+    <input v-model="tokenAdd" placeholder="토큰(발행자) 주소를 입력하세요" />
+    <button @click="fetchAndProcessTx">조회하기</button>
+  </div>
+  <div ref="chartDom" style="width: 100%; height: 1300px"></div>
 </template>
 
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
 import * as echarts from "echarts";
+import { Client, type AccountTxTransaction } from "xrpl";
+
+const client = new Client("wss://s1.ripple.com/");
+const tokenAdd = ref("");
+
+function formatDate(d: Date): string {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  const hours = String(d.getHours()).padStart(2, "0");
+  const minutes = String(d.getMinutes()).padStart(2, "0");
+  const seconds = String(d.getSeconds()).padStart(2, "0");
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+}
+
+async function fetchAndProcessTx() {
+  if (!tokenAdd.value) {
+    alert("토큰 주소를 입력하세요");
+    return;
+  }
+
+  try {
+    //타임스탬프를 시간으로 /
+
+    await client.connect();
+
+    const response = await client.request({
+      command: "account_tx",
+      account: tokenAdd.value,
+      ledger_index_max: -1,
+      ledger_index_min: -1,
+      limit: 15,
+    });
+
+    console.dir(
+      response.result.transactions.filter((tx) => {
+        return tx.tx_json?.TransactionType == "OfferCreate";
+      })
+    );
+
+    const txs = response.result.transactions;
+
+    const { categoryData, values, transactionType } = await formatData(txs);
+
+    //const txs = response.result.transactions.map((tx) => tx.tx_json);
+
+    return { categoryData, values, transactionType };
+  } catch (e) {
+    console.log(e);
+    alert("트랜잭션 조회 중 오류 발생");
+  }
+}
+
+function computeCandleColors(
+  candles: number[][]
+): { value: number[]; itemStyle: { color: string; color0: string } }[] {
+  const result: {
+    value: number[];
+    itemStyle: { color: string; color0: string };
+  }[] = [];
+
+  for (let i = 0; i < candles.length; i++) {
+    const [open, close, low, high] = candles[i];
+    // 효과적인 가격: 여기서는 종가(close)를 사용 (open과 close가 같은 경우 동일)
+    const effectivePrice = close;
+    let color: string;
+
+    if (i === 0) {
+      // 첫 번째 캔들은 비교할 이전 값이 없으므로, 일반적인 규칙: close >= open이면 초록색, 아니면 빨간색.
+      color = close >= open ? "green" : "red";
+    } else {
+      // 만약 시가와 종가가 같다면, 이전 캔들의 효과적 가격과 비교
+      if (open === close) {
+        const prevEffectivePrice = result[i - 1].value[1]; // 이전 캔들의 종가를 효과적 가격으로 사용
+        color = effectivePrice < prevEffectivePrice ? "red" : "green";
+      } else {
+        // 일반적인 경우: close >= open이면 초록색, 그렇지 않으면 빨간색.
+        color = close >= open ? "green" : "red";
+      }
+    }
+
+    result.push({
+      value: candles[i],
+      itemStyle: { color: color, color0: color },
+    });
+  }
+  return result;
+}
+
+async function formatData(txs: AccountTxTransaction<2>[]) {
+  const categoryData = txs.map((tx: any) => {
+    const date = new Date(tx.close_time_iso);
+    return formatDate(date);
+  });
+  let beforePrice = 0;
+  const values = txs.map((tx: any) => {
+    if (tx.tx_json?.TransactionType != "Payment") return beforePrice;
+
+    //buy - 토큰 구분 없이 그냥 모든 buy를 체크 or 여차하면 두번째를 찾게
+    //OPEN은 이전 가격 CLOSE가 현재 가격
+    /*
+      @sell - token으로 xrp로 스왑 / token으로 다른 토큰 스왑
+      @buy - xrp로 token 스왑 / 다른 토큰으로 token 스왑
+
+      2번째 토큰 주소가 있으면 
+    */
+    if (typeof tx.tx_json.SendMax == "object") {
+      //SendMax.issuer가 token 주소라면 판매했다는 의미
+      if (tx.tx_json.SendMax.issuer == tokenAdd.value) {
+        return [beforePrice];
+      } else {
+        //xrp가 아닌 다른 토큰으로 구매했다는 의미
+      }
+    } else {
+      //xrp로 구매
+    }
+  });
+  const volumes: (number | string)[][] = [];
+  const transactionType = txs.map((tx) => {
+    return tx.tx_json?.TransactionType;
+  });
+
+  console.dir(categoryData);
+  console.dir(transactionType);
+  return { categoryData, values, volumes, transactionType };
+}
 
 const chartDom = ref<HTMLDivElement | null>(null);
 
@@ -58,27 +190,28 @@ onMounted(() => {
   // 30개의 임의 데이터 생성
   // 각 데이터 항목: [날짜, open, close, low, high, volume]
   const dummyData: (string | number)[][] = [];
-  for (let i = 0; i < 30; i++) {
+  for (let i = 0; i < 10; i++) {
     const day = i + 1;
     const dayStr = day < 10 ? `0${day}` : `${day}`;
     const date = `2023/01/${dayStr}`;
     const open = 100 + i;
-    const close = open + 1; // 단순 증가
-    const low = open - 1;
-    const high = close + 1;
+    const close = open + 10; // 단순 증가
+    const low = open;
+    const high = close;
     const volume = 1000 + i * 10;
     dummyData.push([date, open, close, low, high, volume]);
   }
 
   // dummyData를 가공
+  console.dir(dummyData);
   const data = splitData(dummyData);
-
+  console.dir(data);
   const option = {
     animation: false,
     legend: {
       bottom: 10,
       left: "center",
-      data: ["Dow-Jones index", "MA5", "MA10", "MA20", "MA30"],
+      data: ["Transactions", "MA5", "MA10", "MA20", "MA30"],
     },
     tooltip: {
       trigger: "axis",
@@ -87,7 +220,7 @@ onMounted(() => {
       },
       borderWidth: 1,
       borderColor: "#ccc",
-      padding: 10,
+      // padding: 10,
       textStyle: {
         color: "#000",
       },
@@ -148,15 +281,15 @@ onMounted(() => {
     },
     grid: [
       {
-        left: "10%",
-        right: "8%",
-        height: "50%",
+        // left: "10%",
+        // right: "8%",
+        height: "80%", // 메인 차트 영역을 60%로 늘림
       },
       {
-        left: "10%",
-        right: "8%",
-        top: "63%",
-        height: "16%",
+        // left: "10%",
+        // right: "8%",
+        top: "20%", // 보조 차트 영역의 위치도 약간 조정
+        height: "50%", // 보조 영역을 20%로 늘림
       },
     ],
     xAxis: [
@@ -213,16 +346,17 @@ onMounted(() => {
         show: true,
         xAxisIndex: [0, 1],
         type: "slider",
-        top: "85%",
+        top: "90%",
         start: 0,
         end: 100,
       },
     ],
     series: [
       {
-        name: "Dow-Jones index",
+        name: "Transactions",
         type: "candlestick",
         data: data.values,
+        barWidth: "100%",
         itemStyle: {
           color: upColor,
           color0: downColor,
