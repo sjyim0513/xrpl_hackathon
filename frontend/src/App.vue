@@ -34,8 +34,6 @@ async function fetchAndProcessTx() {
   }
 
   try {
-    //타임스탬프를 시간으로 /
-
     await client.connect();
 
     const response = await client.request({

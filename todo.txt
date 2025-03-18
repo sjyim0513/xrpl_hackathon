@@ -1,0 +1,18 @@
+1. 토큰 전체를 가져옴
+2. 거래 타입
+    - convert
+    - send
+    - set trust line
+    - offer create
+    - offer cancle
+
+    convert/send => "payment"
+    set trust line => "trust set"
+    offer create/offer cancle => "offer"
+
+3. 입력 받은 토큰의 모든 풀을 찾음
+    -> default는 xrp
+    -> 트랜잭션을 각 풀마다 모음
+    -> 이러면 swap, offer는 다 모임
+
+    문제: send랑 trust set은?
