@@ -16,3 +16,73 @@
     -> 이러면 swap, offer는 다 모임
 
     문제: send랑 trust set은?
+
+
+특정 토큰 주소 입력 받음
+
+## payment 필터링 시작 ##
+-> xrp로 구매 했는지 판매했는지 판별
+    -> 만약 tx.tx_json.sendMax가 string이면 xrp를 보낸거니까
+        -> tx.meta.delivered_amount.issuer가 토큰 주소인지 확인
+            -> isXRP를 true, isBuy를 true로 주고 MakeDataSet 실행
+                -> ModifiedNode 중 LedgerEntryType이 'AccountRoot'이고, 
+                   FinalFields Account가 tx.account랑 같은 노드의 PreviousFields.Balance - FinalFields.Balance해서 정확한 send 수량 알아냄
+                -> tx.meta.delivered_amount.value로 정학한 deliverd 수량 알아냄
+                -> effectivePrice에 deliveredAmount / sendAmount 해서 1개당 스왑 비율 알아냄
+                -> formatDate 함수 실행해서 날짜를 바꿔서 CategoryDate에 저장
+                -> value에 [beforePrice, effectivePrice] 저장
+                -> transaction에 tx 저장
+                -> type에 tx.tx_json.TransactionType 저장
+                -> return { categoryData, value, transaction, transactionType }
+            -> 리턴 받은 데이터들은 groups.A_XRP에 push
+    
+    -> tx.tx_json.sendMax가 string이 아닌 object라면 
+        -> sendMax.issuer가 토큰 주소인지 확인
+            -> 만약 토큰 주소라면 토큰을 팔고 무언가를 얻은 것
+                -> tx.meta.delivered_amount가 string인지 확인
+                    -> 만약 delivered_amount가 string이라면 토큰을 팔고 xrp를 얻은 것
+                        -> isXRP를 true로 주고, isBuy를 false로 주고 MakeDataSet 실행
+                            -> ModifiedNode 중 LedgerEntryType이 RippleState이고, 
+                               ModifiedNode.FinalFields.HighLimit.issuer나 LowLimit.issuer가 tx.tx_json.account인 걸 찾음.
+                               이 후 해당 Node의 PreviousFields.Balance - FinalFields.Balance를 해서 정확한 send 수량 알아냄
+                            -> tx.meta.delivered_amount로 정확한 deliverd 수량 알아냄
+                            -> effectivePrice에 deliveredAmount / sendAmount 해서 1개당 스왑 비율 알아냄
+                            -> formatDate 함수 실행해서 날짜를 바꿔서 CategoryDate에 저장
+                            -> value에 [beforePrice, effectivePrice] 저장
+                            -> transaction에 tx 저장
+                            -> type에 tx.tx_json.TransactionType 저장
+                            -> return { categoryData, value, transaction, transactionType }
+                        -> 리턴 받은 데이터들은 groups.A_XRP에 push
+
+                    -> delivered_amount도 string이 아닌 object라면 토큰을 다른 토큰으로 스왑한 것
+                        -> isXRP를 false로 주고, isBuy를 true로 준 뒤 MakeDataSet 실행
+                            -> 먼저 ModifiedNode 중 LedgerEntryType이 RippleState이고, 
+                               ModifiedNode.FinalFields.HighLimit.issuer가 tx.tx_json.account이고,
+                               ModifiedNode.FinalFields.LowLimit.issuer가 tx.tx_json.sendMax.issuer인 것을 찾음.
+                               이 후 해당 Node의 PreviousFields.Balance - FinalFields.Balance를 해서 정확한 send 수량 알아냄
+                            -> tx.meta.delivered_amount로 정확한 deliverd 수량 알아냄
+                            -> effectivePrice에 deliveredAmount / sendAmount 해서 1개당 스왑 비율 알아냄
+                            -> formatDate 함수 실행해서 날짜를 바꿔서 CategoryDate에 저장
+                            -> value에 [beforePrice, effectivePrice] 저장
+                            -> transaction에 tx 저장
+                            -> type에 tx.tx_json.TransactionType 저장
+                            -> return { categoryData, value, transaction, transactionType }
+                        -> 리턴 받은 데이터들은 groups.A_Other에 push
+
+            -> 만약 sendMax.issuer가 토큰 주소가 아니라면 다른 토큰을 팔고 이 토큰을 deliverd 받은 것
+                -> tx.meta.delivered_amount.issuer가 토큰 주소인지 확인
+                -> isXRP를 false로 주고 isBuy도 false로 준 뒤 makedataset 실행
+                    -> 먼저 ModifiedNode 중 LedgerEntryType이 RippleState이고, 
+                            ModifiedNode.FinalFields.HighLimit.issuer가 tx.tx_json.account이고,
+                            ModifiedNode.FinalFields.LowLimit.issuer가 tx.tx_json.sendMax.issuer인 것을 찾음.
+                            이 후 해당 Node의 PreviousFields.Balance - FinalFields.Balance를 해서 정확한 send 수량 알아냄
+                        -> tx.meta.delivered_amount로 정확한 deliverd 수량 알아냄
+                        -> effectivePrice에 deliveredAmount / sendAmount 해서 1개당 스왑 비율 알아냄
+                        -> formatDate 함수 실행해서 날짜를 바꿔서 CategoryDate에 저장
+                        -> value에 [beforePrice, effectivePrice] 저장
+                        -> transaction에 tx 저장
+                        -> type에 tx.tx_json.TransactionType 저장
+                        -> return { categoryData, value, transaction, transactionType }
+                    -> 리턴 받은 데이터들은 groups.A_Other에 push 
+                        
+                               
