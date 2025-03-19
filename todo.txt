@@ -84,5 +84,7 @@
                         -> type에 tx.tx_json.TransactionType 저장
                         -> return { categoryData, value, transaction, transactionType }
                     -> 리턴 받은 데이터들은 groups.A_Other에 push 
+
+## offer 필터링 시작 ##
                         
                                
