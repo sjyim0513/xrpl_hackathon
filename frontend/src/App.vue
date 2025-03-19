@@ -13,11 +13,22 @@
 import { onMounted, ref } from "vue";
 import * as echarts from "echarts";
 import { Client, type AccountTxTransaction } from "xrpl";
+import type {
+  GroupedTransactions,
+  ModifiedNode,
+  XRPLTransaction,
+} from "./interfaces/transaction_interface";
 
 const client = new Client("wss://s1.ripple.com/");
 const tokenAdd = ref("");
+const limit = ref(50);
+const ledgerMin = ref(-1);
+const ledgerMax = ref(-1);
+const beforePrice = ref(0);
 
-function formatDate(d: Date): string {
+function formatDate(date: number): string {
+  const utc_sec = date + 946684800;
+  const d = new Date(utc_sec * 1000);
   const year = d.getFullYear();
   const month = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
@@ -39,23 +50,18 @@ async function fetchAndProcessTx() {
     const response = await client.request({
       command: "account_tx",
       account: tokenAdd.value,
-      ledger_index_max: -1,
-      ledger_index_min: -1,
-      limit: 15,
+      ledger_index_max: ledgerMax.value,
+      ledger_index_min: ledgerMin.value,
+      limit: limit.value,
     });
-
-    console.dir(
-      response.result.transactions.filter((tx) => {
-        return tx.tx_json?.TransactionType == "OfferCreate";
-      })
-    );
-
-    const txs = response.result.transactions;
-
-    const { categoryData, values, transactionType } = await formatData(txs);
+    console.dir(response.result.transactions);
+    const txs = response.result.transactions; //as XRPLTransaction[];
+    console.dir(txs);
+    const { categoryData, values, transactions, transactionType } =
+      await formatData(txs);
 
     //const txs = response.result.transactions.map((tx) => tx.tx_json);
-
+    await client.disconnect();
     return { categoryData, values, transactionType };
   } catch (e) {
     console.log(e);
@@ -99,12 +105,145 @@ function computeCandleColors(
   return result;
 }
 
-async function formatData(txs: AccountTxTransaction<2>[]) {
-  const categoryData = txs.map((tx: any) => {
-    const date = new Date(tx.close_time_iso);
-    return formatDate(date);
+function getSentAmount(nodes: any[]): number {
+  const RippleStateNode = nodes.filter((node: any) => {
+    if (
+      node.LedgerEntryType === "RippleState" &&
+      node.ModifiedNode &&
+      node.FinalFields.Account === tx.tx_json.Account
+    ) {
+      return node;
+    }
   });
-  let beforePrice = 0;
+
+  // 문자열로 저장된 잔액을 부동소수점 숫자로 변환
+  const prevBal = node.PreviousFields.Balance;
+  const finalBal = node.FinalFields.Balance;
+
+  if (typeof prevBal === "string" && typeof finalBal === "string") {
+    // 두 값이 모두 문자열인 경우
+    const previousBalance = parseFloat(prevBal);
+    const finalBalance = parseFloat(finalBal);
+    return (previousBalance - finalBalance) / 1000000;
+  } else if (typeof prevBal !== "string" && typeof finalBal !== "string") {
+    // 두 값이 모두 객체인 경우
+    const previousBalance = parseFloat(prevBal);
+    const finalBalance = parseFloat(finalBal);
+    return previousBalance - finalBalance;
+  } else {
+    // 한 쪽은 문자열이고 한 쪽은 객체인 경우는 예상치 못한 경우이므로, 오류 처리하거나 null 반환
+    return 0;
+  }
+}
+
+// 잔액이 음수일 수 있으므로, 실제 전송된 양은 이전 잔액에서 최종 잔액의 차이
+// (예를 들어, 토큰을 보냈다면 이전 잔액 > 최종 잔액)
+
+function makedataset(tx: any, isXRP: boolean) {
+  console.log("makedataset", tx.hash);
+  console.dir(tx.meta.AffectedNodes);
+  const categoryData = formatDate(tx.tx_json.date);
+  const modifiedNode = tx.meta.AffectedNodes?.filter((node: any) => {
+    if (node.hasOwnProperty("ModifiedNode")) {
+      const modified = node.ModifiedNode;
+      return (
+        modified.LedgerEntryType === "AccountRoot" &&
+        modified.FinalFields.Account === tx.tx_json.Account
+      );
+    }
+    return false;
+  });
+
+  if (!modifiedNode || modifiedNode.length === 0) {
+    console.log("modifiedNode 없음");
+    return;
+  }
+
+  // 이후 modifiedNodes 배열을 사용하면 됩니다.
+  console.log("Filtered ModifiedNodes:", modifiedNode);
+  console.log("modi", modifiedNode);
+  const deliveredAmount =
+    isXRP == true ? tx.meta.delivered_amount.value : tx.meta.delivered_amount;
+  const sendAmount =
+    isXRP == true
+      ? modifiedNode.PreviousFields.Balance - modifiedNode.FinalFields.Balance
+      : getSentAmount(tx.meta.AffectedNodes);
+  const effectiveRate = parseFloat(deliveredAmount) / sendAmount;
+  const value = [beforePrice];
+  const type = tx.tx_json.TransactionType;
+  return { type, categoryData, value, tx };
+}
+
+async function formatData(txs: any[]) {
+  const groups: GroupedTransactions = { A_XRP: [], A_Other: {} };
+
+  txs.forEach((tx) => {
+    const type = tx.tx_json?.TransactionType;
+    if (type === "Payment") {
+      const meta = tx.meta;
+      const tx_json = tx.tx_json;
+
+      if (typeof meta === "string") return;
+      //xrp를 보내고 토큰을 받음 (buy)
+      if (typeof tx_json?.SendMax === "string") {
+        if (typeof meta.delivered_amount !== "string") {
+          console.log(
+            "meta.delivered_amount?.issuer",
+            meta.delivered_amount?.issuer,
+            tokenAdd.value
+          );
+          //받는 토큰이 tokenAddress임 -> currency도 나중에 처리하게 수정해야함
+          if (meta.delivered_amount?.issuer === tokenAdd.value) {
+            console.log("!!");
+            makedataset(tx, true);
+          } else {
+            console.log("xrp를 보냈는데 받은 토큰이 tokenAddress가 아님: ", tx);
+          }
+        }
+      } else if (tx_json?.SendMax?.issuer === tokenAdd.value) {
+        //tokenAddress를 보냄
+        //받은 토큰이 xrp
+        if (typeof meta.delivered_amount === "string") {
+        } else {
+          console.log("tokenAddress를 보냈는데 받은 토큰이 xrp가 아님: ", tx);
+        }
+      }
+
+      if (meta.delivered_amount && typeof meta.delivered_amount === "string") {
+        // groups.A_XRP.push(tx);
+      } else if (tx.tx_json?.SendMax) {
+        // 만약 SendMax가 객체인 경우, 해당 통화 코드와 발행자 조합으로 분류
+        const sendMax = tx.tx_json.SendMax as {
+          currency: string;
+          issuer: string;
+          value: string;
+        };
+
+        if (
+          sendMax.currency === "41524D5900000000000000000000000000000000" &&
+          sendMax.issuer === tokenAdd.value
+        ) {
+          // 이 경우에도 XRP 거래일 수도 있으나, 여기서는 A/다른토큰 거래라고 가정
+          // 예: 해당 거래 경로에 다른 통화가 포함된 경우, Paths 필드 등을 활용할 수 있음.
+          // 여기서는 예시로 sendMax.currency를 키로 사용
+          if (!groups.A_Other[sendMax.currency]) {
+            groups.A_Other[sendMax.currency] = [];
+          }
+          groups.A_Other[sendMax.currency].push(tx);
+        } else {
+          // 만약 다른 토큰과의 거래라면, 해당 토큰 통화 코드를 사용하여 그룹화
+          const key = sendMax.currency;
+          if (!groups.A_Other[key]) {
+            groups.A_Other[key] = [];
+          }
+          groups.A_Other[key].push(tx);
+        }
+      }
+    } else if (type == "TrustSet") {
+    } else if (type == "OfferCancel" || type == "OfferCreate") {
+    }
+  });
+
   const values = txs.map((tx: any) => {
     if (tx.tx_json?.TransactionType != "Payment") return beforePrice;
 
@@ -114,7 +253,7 @@ async function formatData(txs: AccountTxTransaction<2>[]) {
       @sell - token으로 xrp로 스왑 / token으로 다른 토큰 스왑
       @buy - xrp로 token 스왑 / 다른 토큰으로 token 스왑
 
-      2번째 토큰 주소가 있으면 
+      2번째 토큰 주소가 있으면
     */
     if (typeof tx.tx_json.SendMax == "object") {
       //SendMax.issuer가 token 주소라면 판매했다는 의미
@@ -127,14 +266,14 @@ async function formatData(txs: AccountTxTransaction<2>[]) {
       //xrp로 구매
     }
   });
-  const volumes: (number | string)[][] = [];
+  const transactions: (number | string)[][] = [];
   const transactionType = txs.map((tx) => {
     return tx.tx_json?.TransactionType;
   });
-
+  const categoryData = 0;
   console.dir(categoryData);
   console.dir(transactionType);
-  return { categoryData, values, volumes, transactionType };
+  return { categoryData, values, transactions, transactionType };
 }
 
 const chartDom = ref<HTMLDivElement | null>(null);
