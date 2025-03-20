@@ -92,3 +92,8 @@ export interface GroupedTransactions {
   A_XRP: XRPLTransaction[]; // 예: DeliveredAmount가 XRP로 표기된 거래
   A_Other: Record<string, XRPLTransaction[]>; // 예: A와 다른 토큰(예: SIG 등) 거래, 키는 대상 통화 코드
 }
+
+export interface PoolState {
+  beforeprice: number;
+  poolData: Array<[string, any, string, any]>;
+}

@@ -12,19 +12,17 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
 import * as echarts from "echarts";
-import { Client, type AccountTxTransaction } from "xrpl";
-import type {
-  GroupedTransactions,
-  ModifiedNode,
-  XRPLTransaction,
-} from "./interfaces/transaction_interface";
+import { Client } from "xrpl";
+import { usePoolPriceState } from "./stores/usePoolPriceState";
+
+const { getBeforePrice, setBeforePrice, addPoolData, getPoolData } =
+  usePoolPriceState();
 
 const client = new Client("wss://s1.ripple.com/");
 const tokenAdd = ref("");
-const limit = ref(50);
+const limit = ref(15);
 const ledgerMin = ref(-1);
 const ledgerMax = ref(-1);
-const beforePrice = ref(0);
 
 function formatDate(date: number): string {
   const utc_sec = date + 946684800;
@@ -57,12 +55,12 @@ async function fetchAndProcessTx() {
     console.dir(response.result.transactions);
     const txs = response.result.transactions; //as XRPLTransaction[];
     console.dir(txs);
-    const { categoryData, values, transactions, transactionType } =
-      await formatData(txs);
+    await formatData(txs);
 
+    console.log("");
+    getPoolData("all");
     //const txs = response.result.transactions.map((tx) => tx.tx_json);
     await client.disconnect();
-    return { categoryData, values, transactionType };
   } catch (e) {
     console.log(e);
     alert("트랜잭션 조회 중 오류 발생");
@@ -105,175 +103,193 @@ function computeCandleColors(
   return result;
 }
 
-function getSentAmount(nodes: any[]): number {
-  const RippleStateNode = nodes.filter((node: any) => {
-    if (
-      node.LedgerEntryType === "RippleState" &&
-      node.ModifiedNode &&
-      node.FinalFields.Account === tx.tx_json.Account
-    ) {
-      return node;
+function makedataset(tx: any, isXRP: boolean, isBuy: boolean) {
+  try {
+    const categoryData = formatDate(tx.tx_json.date);
+    if (isXRP) {
+      //xrp로 token을 구매한 경우
+      if (isBuy) {
+        const nodeWrapper = tx.meta.AffectedNodes?.find((node: any) => {
+          if (node.hasOwnProperty("ModifiedNode")) {
+            return (
+              node.ModifiedNode.LedgerEntryType === "AccountRoot" &&
+              node.ModifiedNode.FinalFields.Account === tx.tx_json.Account
+            );
+          }
+        });
+
+        if (!nodeWrapper) {
+          console.log("ModifiedNode 없음");
+          return;
+        }
+
+        const modifiedNode = nodeWrapper.ModifiedNode;
+        const sendAmount =
+          (modifiedNode.PreviousFields.Balance -
+            modifiedNode.FinalFields.Balance) /
+          1000000;
+        const deliveredAmount = tx.meta.delivered_amount.value;
+        const effectiveRate = deliveredAmount / sendAmount;
+        const poolId = "xrp";
+        const beforePrice = getBeforePrice(poolId);
+        const value = [beforePrice, effectiveRate];
+        const type = tx.tx_json.TransactionType;
+        setBeforePrice(poolId, effectiveRate);
+        addPoolData(poolId, [categoryData, value, type, tx]);
+      } else {
+        //이 토큰으로 xrp를 구매한 경우
+        const nodeWrapper = tx.meta.AffectedNodes?.find((node: any) => {
+          if (node.hasOwnProperty("ModifiedNode")) {
+            const modified = node.ModifiedNode;
+            if (modified.LedgerEntryType === "RippleState") {
+              return (
+                modified.FinalFields.HighLimit.issuer === tx.tx_json.Account ||
+                modified.FinalFields.LowLimit.issuer === tx.tx_json.Account
+              );
+            }
+          }
+        });
+
+        if (!nodeWrapper) {
+          console.log("ModifiedNode 없음");
+          return;
+        }
+        const modified = nodeWrapper.ModifiedNode;
+        const sendAmount =
+          modified.PreviousFields.Balance.value -
+          modified.FinalFields.Balance.value;
+        const deliveredAmount = tx.meta.delivered_amount / 1000000;
+        const effectiveRate = deliveredAmount / sendAmount;
+        const poolId = "xrp";
+        const beforePrice = getBeforePrice(poolId);
+        const value = [beforePrice, effectiveRate];
+        const type = tx.tx_json.TransactionType;
+        setBeforePrice(poolId, effectiveRate);
+        addPoolData(poolId, [categoryData, value, type, tx]);
+      }
+    } else {
+      //token으로 다른 토큰을 구매한 경우
+      if (isBuy) {
+        const nodeWrapper = tx.meta.AffectedNodes?.find((node: any) => {
+          if (node.hasOwnProperty("ModifiedNode")) {
+            const modified = node.ModifiedNode;
+            if (modified.LedgerEntryType === "RippleState") {
+              // 두 가지 조건 중 하나라도 만족하면 true를 반환합니다.
+              return (
+                (modified.FinalFields.HighLimit.issuer === tx.tx_json.Account &&
+                  modified.FinalFields.LowLimit.issuer === tokenAdd.value) ||
+                (modified.FinalFields.LowLimit.issuer === tx.tx_json.Account &&
+                  modified.FinalFields.HighLimit.issuer === tokenAdd.value)
+              );
+            }
+          }
+        });
+        if (!nodeWrapper) {
+          console.log("ModifiedNode 없음");
+          return;
+        }
+        const modified = nodeWrapper.ModifiedNode;
+        const sendAmount =
+          modified.PreviousFields.Balance.value -
+          modified.FinalFields.Balance.value;
+        const deliveredAmount = tx.meta.delivered_amount.value;
+        const effectiveRate = deliveredAmount / sendAmount;
+        const poolId = `${tx.meta.delivered_amount.currency}_${tx.meta.delivered_amount.issuer}`;
+        const beforePrice = getBeforePrice(poolId);
+        const value = [beforePrice, effectiveRate];
+        const type = tx.tx_json.TransactionType;
+        setBeforePrice(poolId, effectiveRate);
+        addPoolData(poolId, [categoryData, value, type, tx]);
+      } else {
+        //다른 토큰을 판매하고 이 토큰을 얻은 경우
+        const nodeWrapper = tx.meta.AffectedNodes?.find((node: any) => {
+          if (node.hasOwnProperty("ModifiedNode")) {
+            const modified = node.ModifiedNode;
+            if (modified.LedgerEntryType === "RippleState") {
+              // 두 가지 조건 중 하나라도 만족하면 true를 반환합니다.
+              return (
+                (modified.FinalFields.HighLimit.issuer === tx.tx_json.Account &&
+                  modified.FinalFields.LowLimit.issuer ===
+                    tx.tx_json.SendMax.issuer) ||
+                (modified.FinalFields.LowLimit.issuer === tx.tx_json.Account &&
+                  modified.FinalFields.HighLimit.issuer ===
+                    tx.tx_json.SendMax.issuer)
+              );
+            }
+          }
+        });
+        if (!nodeWrapper) {
+          console.log("ModifiedNode 없음");
+          return;
+        }
+        const modified = nodeWrapper.ModifiedNode;
+        const sendAmount =
+          modified.PreviousFields.Balance.value -
+          modified.FinalFields.Balance.value;
+        const deliveredAmount = tx.meta.delivered_amount.value;
+        const effectiveRate = deliveredAmount / sendAmount;
+        const poolId = `${tx.tx_json.SendMax.currency}_${tx.tx_json.SendMax.issuer}`;
+        const beforePrice = getBeforePrice(poolId);
+        const value = [beforePrice, effectiveRate];
+        const type = tx.tx_json.TransactionType;
+        setBeforePrice(poolId, effectiveRate);
+        addPoolData(poolId, [categoryData, value, type, tx]);
+      }
     }
-  });
-
-  // 문자열로 저장된 잔액을 부동소수점 숫자로 변환
-  const prevBal = node.PreviousFields.Balance;
-  const finalBal = node.FinalFields.Balance;
-
-  if (typeof prevBal === "string" && typeof finalBal === "string") {
-    // 두 값이 모두 문자열인 경우
-    const previousBalance = parseFloat(prevBal);
-    const finalBalance = parseFloat(finalBal);
-    return (previousBalance - finalBalance) / 1000000;
-  } else if (typeof prevBal !== "string" && typeof finalBal !== "string") {
-    // 두 값이 모두 객체인 경우
-    const previousBalance = parseFloat(prevBal);
-    const finalBalance = parseFloat(finalBal);
-    return previousBalance - finalBalance;
-  } else {
-    // 한 쪽은 문자열이고 한 쪽은 객체인 경우는 예상치 못한 경우이므로, 오류 처리하거나 null 반환
-    return 0;
+  } catch (e) {
+    console.log("error: ", e, tx);
   }
-}
-
-// 잔액이 음수일 수 있으므로, 실제 전송된 양은 이전 잔액에서 최종 잔액의 차이
-// (예를 들어, 토큰을 보냈다면 이전 잔액 > 최종 잔액)
-
-function makedataset(tx: any, isXRP: boolean) {
-  console.log("makedataset", tx.hash);
-  console.dir(tx.meta.AffectedNodes);
-  const categoryData = formatDate(tx.tx_json.date);
-  const modifiedNode = tx.meta.AffectedNodes?.filter((node: any) => {
-    if (node.hasOwnProperty("ModifiedNode")) {
-      const modified = node.ModifiedNode;
-      return (
-        modified.LedgerEntryType === "AccountRoot" &&
-        modified.FinalFields.Account === tx.tx_json.Account
-      );
-    }
-    return false;
-  });
-
-  if (!modifiedNode || modifiedNode.length === 0) {
-    console.log("modifiedNode 없음");
-    return;
-  }
-
-  // 이후 modifiedNodes 배열을 사용하면 됩니다.
-  console.log("Filtered ModifiedNodes:", modifiedNode);
-  console.log("modi", modifiedNode);
-  const deliveredAmount =
-    isXRP == true ? tx.meta.delivered_amount.value : tx.meta.delivered_amount;
-  const sendAmount =
-    isXRP == true
-      ? modifiedNode.PreviousFields.Balance - modifiedNode.FinalFields.Balance
-      : getSentAmount(tx.meta.AffectedNodes);
-  const effectiveRate = parseFloat(deliveredAmount) / sendAmount;
-  const value = [beforePrice];
-  const type = tx.tx_json.TransactionType;
-  return { type, categoryData, value, tx };
 }
 
 async function formatData(txs: any[]) {
-  const groups: GroupedTransactions = { A_XRP: [], A_Other: {} };
-
   txs.forEach((tx) => {
     const type = tx.tx_json?.TransactionType;
     if (type === "Payment") {
-      const meta = tx.meta;
-      const tx_json = tx.tx_json;
+      if (tx.tx_json.Account === tx.tx_json.Destination) {
+        const meta = tx.meta;
+        const tx_json = tx.tx_json;
 
-      if (typeof meta === "string") return;
-      //xrp를 보내고 토큰을 받음 (buy)
-      if (typeof tx_json?.SendMax === "string") {
-        if (typeof meta.delivered_amount !== "string") {
-          console.log(
-            "meta.delivered_amount?.issuer",
-            meta.delivered_amount?.issuer,
-            tokenAdd.value
-          );
-          //받는 토큰이 tokenAddress임 -> currency도 나중에 처리하게 수정해야함
-          if (meta.delivered_amount?.issuer === tokenAdd.value) {
-            console.log("!!");
-            makedataset(tx, true);
+        //xrp를 보내고 토큰을 받음 (buy)
+        if (typeof tx_json?.SendMax === "string") {
+          if (meta.delivered_amount.issuer === tokenAdd.value) {
+            console.log("xrp로 구매", makedataset(tx, true, true));
+            //받는 토큰이 tokenAddress임 -> currency도 나중에 처리하게 수정해야함
           } else {
-            console.log("xrp를 보냈는데 받은 토큰이 tokenAddress가 아님: ", tx);
+            console.log(
+              "xrp를 보냈는데 받은 토큰이 tokenAddress가 아님: ",
+              tx,
+              meta.delivered_amount.issuer,
+              tokenAdd.value
+            );
           }
-        }
-      } else if (tx_json?.SendMax?.issuer === tokenAdd.value) {
-        //tokenAddress를 보냄
-        //받은 토큰이 xrp
-        if (typeof meta.delivered_amount === "string") {
-        } else {
-          console.log("tokenAddress를 보냈는데 받은 토큰이 xrp가 아님: ", tx);
-        }
-      }
-
-      if (meta.delivered_amount && typeof meta.delivered_amount === "string") {
-        // groups.A_XRP.push(tx);
-      } else if (tx.tx_json?.SendMax) {
-        // 만약 SendMax가 객체인 경우, 해당 통화 코드와 발행자 조합으로 분류
-        const sendMax = tx.tx_json.SendMax as {
-          currency: string;
-          issuer: string;
-          value: string;
-        };
-
-        if (
-          sendMax.currency === "41524D5900000000000000000000000000000000" &&
-          sendMax.issuer === tokenAdd.value
-        ) {
-          // 이 경우에도 XRP 거래일 수도 있으나, 여기서는 A/다른토큰 거래라고 가정
-          // 예: 해당 거래 경로에 다른 통화가 포함된 경우, Paths 필드 등을 활용할 수 있음.
-          // 여기서는 예시로 sendMax.currency를 키로 사용
-          if (!groups.A_Other[sendMax.currency]) {
-            groups.A_Other[sendMax.currency] = [];
+        } else if (tx_json?.SendMax?.issuer === tokenAdd.value) {
+          //받은 토큰이 xrp
+          if (typeof meta.delivered_amount === "string") {
+            console.log("토큰 판매 후 xrp 받음", makedataset(tx, true, false));
+          } else {
+            console.log(
+              "이 토큰으로 다른 토큰 구매:  ",
+              makedataset(tx, false, true)
+            );
           }
-          groups.A_Other[sendMax.currency].push(tx);
-        } else {
-          // 만약 다른 토큰과의 거래라면, 해당 토큰 통화 코드를 사용하여 그룹화
-          const key = sendMax.currency;
-          if (!groups.A_Other[key]) {
-            groups.A_Other[key] = [];
-          }
-          groups.A_Other[key].push(tx);
+        } else if (meta.delivered_amount.issuer === tokenAdd.value) {
+          //다른 토큰에서 현재 토큰으로 변환
+          console.log(
+            "다른 토큰으로 이 토큰을 구매함",
+            makedataset(tx, false, false)
+          );
         }
+      } else {
+        const categoryData = formatDate(tx.tx_json.date);
+        const poolId = `${tx.meta.delivered_amount.currency}_${tx.meta.delivered_amount.issuer}`;
+        const beforePrice = getBeforePrice(poolId);
+        const value = [beforePrice, beforePrice];
+        addPoolData(poolId, [categoryData, value, type, tx]);
       }
     } else if (type == "TrustSet") {
     } else if (type == "OfferCancel" || type == "OfferCreate") {
     }
   });
-
-  const values = txs.map((tx: any) => {
-    if (tx.tx_json?.TransactionType != "Payment") return beforePrice;
-
-    //buy - 토큰 구분 없이 그냥 모든 buy를 체크 or 여차하면 두번째를 찾게
-    //OPEN은 이전 가격 CLOSE가 현재 가격
-    /*
-      @sell - token으로 xrp로 스왑 / token으로 다른 토큰 스왑
-      @buy - xrp로 token 스왑 / 다른 토큰으로 token 스왑
-
-      2번째 토큰 주소가 있으면
-    */
-    if (typeof tx.tx_json.SendMax == "object") {
-      //SendMax.issuer가 token 주소라면 판매했다는 의미
-      if (tx.tx_json.SendMax.issuer == tokenAdd.value) {
-        return [beforePrice];
-      } else {
-        //xrp가 아닌 다른 토큰으로 구매했다는 의미
-      }
-    } else {
-      //xrp로 구매
-    }
-  });
-  const transactions: (number | string)[][] = [];
-  const transactionType = txs.map((tx) => {
-    return tx.tx_json?.TransactionType;
-  });
-  const categoryData = 0;
-  console.dir(categoryData);
-  console.dir(transactionType);
-  return { categoryData, values, transactions, transactionType };
 }
 
 const chartDom = ref<HTMLDivElement | null>(null);
