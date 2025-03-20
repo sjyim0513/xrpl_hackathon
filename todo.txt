@@ -85,11 +85,14 @@
                         -> return { categoryData, value, transaction, transactionType }
                     -> 리턴 받은 데이터들은 groups.A_Other에 push 
 
+## Send 필터링 시작 ##
+-> payment 중 tx.tx_json.Account랑 tx.tx_json.Destination이 다른 트잭을 찾음
+    -> tx.meta.delivered_amount.value 값이 send 값
+
 ## offer 필터링 시작 ##
+-> 
 
 ## TrustSet 필터링 시작 ##
-
-## Send 필터링 시작 ##
 
 ## 스왑 Path로 사용된 경우 필터링 시작 ##
 
