@@ -99,7 +99,7 @@ export interface PoolState {
   values: number[][];
   type: string[];
   tx: any[];
-  info: any[];
+  info: (payment | send | route | trustLine | offer)[];
 }
 
 export interface payment {
