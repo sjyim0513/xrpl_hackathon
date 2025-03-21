@@ -96,7 +96,7 @@ export interface PoolState {
   beforeprice: number;
   //poolData: Array<[string, any, string, any, any]>;
   categoryDate: string[];
-  values: any[];
+  values: number[][];
   type: string[];
   tx: any[];
   info: any[];

@@ -4,7 +4,6 @@ import type { PoolState } from "../interfaces/transaction_interface";
 const state = reactive<Record<string, PoolState>>({});
 
 export function usePoolPriceState() {
-  // 풀 초기화: 해당 poolId가 없으면 초기값 설정
   function initializePool(poolId: string) {
     if (!(poolId in state)) {
       state[poolId] = {
@@ -18,19 +17,16 @@ export function usePoolPriceState() {
     }
   }
 
-  // 해당 풀의 beforeprice를 가져옴
   function getBeforePrice(poolId: string): number {
     initializePool(poolId);
     return state[poolId].beforeprice;
   }
 
-  // 해당 풀의 beforeprice를 업데이트함
   function setBeforePrice(poolId: string, newValue: number) {
     initializePool(poolId);
     state[poolId].beforeprice = newValue;
   }
 
-  // 해당 풀에 새로운 데이터를 추가함
   function addPoolData(
     poolId: string,
     data: [string, any, string, any],
@@ -46,21 +42,28 @@ export function usePoolPriceState() {
   }
 
   function addtoAllPoolDatas(data: [string, string, any], info: any) {
+    if (Object.keys(state).length === 0) {
+      console.log("없음");
+      initializePool("xrp");
+    }
     Object.keys(state).forEach((poolId) => {
       const beforePrice = getBeforePrice(poolId);
-      const value = [beforePrice, beforePrice, beforePrice, beforePrice];
+      const value = [
+        beforePrice,
+        beforePrice + 0.00000000001,
+        beforePrice,
+        beforePrice + 0.00000000001,
+      ];
       state[poolId].categoryDate.push(data[0]);
       state[poolId].values.push(value);
       state[poolId].type.push(data[1]);
       state[poolId].tx.push(data[2]);
       state[poolId].info.push(info);
-      // 결과 배열: 첫 번째는 data[0], 두 번째는 value, 세 번째는 data[1], 네 번째는 data[2], 마지막은 info
     });
   }
 
-  // 필요시 해당 풀의 poolData를 가져오는 함수
   function getPoolData(poolId: string) {
-    console.log(state);
+    console.log("state", state);
     return state[poolId];
   }
 

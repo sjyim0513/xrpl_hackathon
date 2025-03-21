@@ -24,7 +24,7 @@ const {
 
 const client = new Client("wss://s1.ripple.com/");
 const tokenAdd = ref("");
-const limit = ref(30);
+const limit = ref(15);
 const ledgerMin = ref(-1);
 const ledgerMax = ref(-1);
 const poolList = ref("xrp");
@@ -55,11 +55,11 @@ async function fetchAndProcessTx() {
       account: tokenAdd.value,
       ledger_index_max: ledgerMax.value,
       ledger_index_min: ledgerMin.value,
-      limit: limit.value,
+      // limit: limit.value,
+      // forward: true,
     });
 
     const txs = response.result.transactions;
-
     await formatData(txs);
 
     // const values = getValues(poolList.value);
@@ -163,7 +163,7 @@ function makedataset(tx: any, isXRP: boolean, isBuy: boolean) {
         });
 
         if (!nodeWrapper) {
-          console.log("ModifiedNode 없음!!!", tx);
+          console.log("ModifiedNode 없음", tx);
           return;
         }
 
@@ -202,7 +202,7 @@ function makedataset(tx: any, isXRP: boolean, isBuy: boolean) {
           );
         });
         if (!nodeWrapper) {
-          console.log("ModifiedNode 없음!!", tx);
+          console.log("ModifiedNode 없음", tx);
           return;
         }
         const modified = nodeWrapper.ModifiedNode ?? nodeWrapper.DeletedNode;
@@ -242,7 +242,7 @@ function makedataset(tx: any, isXRP: boolean, isBuy: boolean) {
           }
         });
         if (!nodeWrapper) {
-          console.log("ModifiedNode 없음!", tx);
+          console.log("ModifiedNode 없음", tx);
           return;
         }
         const modified = nodeWrapper.ModifiedNode;
@@ -272,7 +272,8 @@ function makedataset(tx: any, isXRP: boolean, isBuy: boolean) {
 }
 
 async function formatData(txs: any[]) {
-  txs.forEach((tx) => {
+  const reversedTxs = [...txs].reverse();
+  reversedTxs.forEach((tx) => {
     try {
       const type = tx.tx_json?.TransactionType;
       if (type === "Payment") {
@@ -287,12 +288,7 @@ async function formatData(txs: any[]) {
               // console.log("xrp로 구매");
               //받는 토큰이 tokenAddress임 -> currency도 나중에 처리하게 수정해야함
             } else {
-              // console.log(
-              //   "xrp를 보냈는데 받은 토큰이 tokenAddress가 아님: ",
-              //   tx,
-              //   meta.delivered_amount.issuer,
-              //   tokenAdd.value
-              // );
+              // console.log("xrp를 보냈는데 받은 토큰이 tokenAddress가 아님: ");
               const categoryData = formatDate(tx.tx_json.date);
               const poolId = `${tx.meta.delivered_amount.currency}_${tx.meta.delivered_amount.issuer}`;
               const beforePrice = getBeforePrice(poolId);
@@ -325,11 +321,15 @@ async function formatData(txs: any[]) {
           }
         } else {
           const categoryData = formatDate(tx.tx_json.date);
+          const delivered =
+            typeof tx.meta.delivered_amount === "string"
+              ? tx.meta.delivered_amount / 1000000
+              : tx.meta.delivered_amount.value;
           const info: send = {
             keyType: "send",
             account: tx.tx_json.Account,
             fee: tx.tx_json.Fee / 1000000,
-            deliveredAmount: tx.meta.delivered_amount.value,
+            deliveredAmount: delivered,
             Destination: tx.tx_json.Destination,
           };
           addtoAllPoolDatas([categoryData, type, tx], info);
@@ -368,20 +368,34 @@ function calculateMA(dayCount: number, data: { values: number[][] }) {
   return result;
 }
 
+onMounted(() => {
+  if (chartDom.value) {
+    myChart.value = echarts.init(chartDom.value);
+
+    const initialOption = {
+      title: { text: "초기 차트" },
+      xAxis: { data: [] },
+      yAxis: {},
+      series: [],
+    };
+    myChart.value.setOption(initialOption);
+  }
+});
+
 function updateChart() {
   if (!myChart.value) return;
-  // getPoolData()를 이용해 처리된 데이터를 가져와서 새로운 옵션 구성
-  const option = getChartOption();
-  myChart.value.setOption(option, true);
-}
-
-function getChartOption() {
-  //일어나서 노트북으로 깃허브꺼 받고 데이터 형태 차이 보기
   const txDate = getPoolData(poolList.value);
-  console.log("txDate", txDate);
-  console.log("categoryDate", txDate.categoryDate);
-  console.log("values", txDate.values[0]);
-  return {
+  if (
+    !txDate ||
+    !txDate.categoryDate ||
+    !txDate.values ||
+    txDate.categoryDate.length === 0 ||
+    txDate.values.length === 0
+  ) {
+    console.warn("차트에 사용할 데이터가 준비되지 않았습니다.", txDate);
+    return;
+  }
+  const option = {
     animation: false,
     legend: {
       bottom: 10,
@@ -390,10 +404,15 @@ function getChartOption() {
     },
     tooltip: {
       trigger: "axis",
-      axisPointer: { type: "cross" },
+      axisPointer: {
+        type: "cross",
+      },
       borderWidth: 1,
       borderColor: "#ccc",
-      textStyle: { color: "#000" },
+      // padding: 10,
+      textStyle: {
+        color: "#000",
+      },
       position: function (
         pos: number[],
         params: any,
@@ -402,10 +421,66 @@ function getChartOption() {
         size: any
       ) {
         const obj: Record<string, number> = { top: 10 };
+        // 차트의 왼쪽/오른쪽에 따라 위치 지정
         obj[pos[0] < size.viewSize[0] / 2 ? "left" : "right"] = 30;
         return obj;
       },
     },
+    axisPointer: {
+      link: [
+        {
+          xAxisIndex: "all",
+        },
+      ],
+      label: {
+        backgroundColor: "#777",
+      },
+    },
+    toolbox: {
+      feature: {
+        dataZoom: {
+          yAxisIndex: false,
+        },
+        brush: {
+          type: ["lineX", "clear"],
+        },
+      },
+    },
+    brush: {
+      xAxisIndex: "all",
+      brushLink: "all",
+      outOfBrush: {
+        colorAlpha: 0.1,
+      },
+    },
+    visualMap: {
+      show: false,
+      seriesIndex: 5,
+      dimension: 2,
+      pieces: [
+        {
+          value: 1,
+          color: downColor,
+        },
+        {
+          value: -1,
+          color: upColor,
+        },
+      ],
+    },
+    grid: [
+      {
+        // left: "10%",
+        // right: "8%",
+        height: "80%",
+      },
+      {
+        // left: "10%",
+        // right: "8%",
+        top: "20%",
+        height: "50%",
+      },
+    ],
     xAxis: [
       {
         type: "category",
@@ -415,7 +490,9 @@ function getChartOption() {
         splitLine: { show: false },
         min: "dataMin",
         max: "dataMax",
-        axisPointer: { z: 100 },
+        axisPointer: {
+          z: 100,
+        },
       },
       {
         type: "category",
@@ -433,7 +510,9 @@ function getChartOption() {
     yAxis: [
       {
         scale: true,
-        splitArea: { show: true },
+        splitArea: {
+          show: true,
+        },
       },
       {
         scale: true,
@@ -465,67 +544,19 @@ function getChartOption() {
       {
         name: "Transactions",
         type: "candlestick",
-        data: txDate.values, // 실제 가격 데이터 배열
+        data: txDate.values,
         barWidth: "100%",
         itemStyle: {
-          color: "#00da3c",
-          color0: "#ec0000",
+          color: upColor,
+          color0: downColor,
+          borderColor: undefined,
+          borderColor0: undefined,
         },
       },
-      // {
-      //   name: "MA5",
-      //   type: "line",
-      //   data: calculateMA(5, txDate),
-      //   smooth: true,
-      //   lineStyle: { opacity: 0.5 },
-      // },
-      // {
-      //   name: "MA10",
-      //   type: "line",
-      //   data: calculateMA(10, txDate),
-      //   smooth: true,
-      //   lineStyle: { opacity: 0.5 },
-      // },
-      // {
-      //   name: "MA20",
-      //   type: "line",
-      //   data: calculateMA(20, txDate),
-      //   smooth: true,
-      //   lineStyle: { opacity: 0.5 },
-      // },
-      // {
-      //   name: "MA30",
-      //   type: "line",
-      //   data: calculateMA(30, txDate),
-      //   smooth: true,
-      //   lineStyle: { opacity: 0.5 },
-      // },
     ],
   };
+
+  myChart.value.clear();
+  myChart.value.setOption(option, true);
 }
-
-onMounted(() => {
-  if (chartDom.value) {
-    myChart.value = echarts.init(chartDom.value);
-    const emptyOption = {
-      title: { text: "데이터 없음" },
-      xAxis: { data: [] },
-      yAxis: {},
-      series: [],
-    };
-    myChart.value.setOption(emptyOption);
-  }
-});
-
-// // 브러시(brush) 액션으로 특정 범위 강조 (예시: 임의의 날짜 범위)
-// myChart.dispatchAction({
-//   type: "brush",
-//   areas: [
-//     {
-//       brushType: "lineX",
-//       coordRange: ["2023/01/10", "2023/01/20"],
-//       xAxisIndex: 0,
-//     },
-//   ],
-// });
 </script>
