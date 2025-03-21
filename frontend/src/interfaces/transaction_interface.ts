@@ -81,19 +81,62 @@ export interface XRPLTransaction {
     delivered_amount?:
       | string
       | { currency: string; issuer: string; value: string };
-    AffectedNodes?: ModifiedNode[]; // 추가: 거래에 영향을 받은 노드들의 배열 (ModifiedNode 등)
+    AffectedNodes?: ModifiedNode[];
   };
   ledger_index: number;
   hash: string;
-  // 기타 필요한 필드...
 }
 
 export interface GroupedTransactions {
-  A_XRP: XRPLTransaction[]; // 예: DeliveredAmount가 XRP로 표기된 거래
-  A_Other: Record<string, XRPLTransaction[]>; // 예: A와 다른 토큰(예: SIG 등) 거래, 키는 대상 통화 코드
+  A_XRP: XRPLTransaction[];
+  A_Other: Record<string, XRPLTransaction[]>;
 }
 
 export interface PoolState {
   beforeprice: number;
-  poolData: Array<[string, any, string, any]>;
+  //poolData: Array<[string, any, string, any, any]>;
+  categoryDate: string[];
+  values: any[];
+  type: string[];
+  tx: any[];
+  info: any[];
 }
+
+export interface payment {
+  keyType: string;
+  account: string;
+  fee: number;
+  sendAmount: number;
+  deliveredAmount: number;
+}
+
+export interface send {
+  keyType: string;
+  account: string;
+  fee: number;
+  deliveredAmount: string;
+  Destination: string;
+}
+
+export interface route {
+  keyType: string;
+  account: string;
+  fee: number;
+}
+
+export interface trustLine {
+  keyType: string;
+  account: string;
+  fee: number;
+  amount: string;
+}
+
+export interface offer {
+  keyType: string;
+  account: string;
+  fee: number;
+  takerpay: string | { currency: string; issuer: string; value: string };
+  takerget: string | { currency: string; issuer: string; value: string };
+}
+
+export interface txInfo {}

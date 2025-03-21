@@ -1,8 +1,6 @@
 <template>
-  <!-- 차트를 렌더링할 요소 -->
   <div>
     <h2>토큰 트랜잭션 기반 OHLC 차트</h2>
-    <!-- 토큰 주소 입력 -->
     <input v-model="tokenAdd" placeholder="토큰(발행자) 주소를 입력하세요" />
     <button @click="fetchAndProcessTx">조회하기</button>
   </div>
@@ -14,15 +12,22 @@ import { onMounted, ref } from "vue";
 import * as echarts from "echarts";
 import { Client } from "xrpl";
 import { usePoolPriceState } from "./stores/usePoolPriceState";
+import type { payment, route, send } from "./interfaces/transaction_interface";
 
-const { getBeforePrice, setBeforePrice, addPoolData, getPoolData } =
-  usePoolPriceState();
+const {
+  getBeforePrice,
+  setBeforePrice,
+  addPoolData,
+  addtoAllPoolDatas,
+  getPoolData,
+} = usePoolPriceState();
 
 const client = new Client("wss://s1.ripple.com/");
 const tokenAdd = ref("");
-const limit = ref(15);
+const limit = ref(30);
 const ledgerMin = ref(-1);
 const ledgerMax = ref(-1);
+const poolList = ref("xrp");
 
 function formatDate(date: number): string {
   const utc_sec = date + 946684800;
@@ -38,7 +43,7 @@ function formatDate(date: number): string {
 
 async function fetchAndProcessTx() {
   if (!tokenAdd.value) {
-    alert("토큰 주소를 입력하세요");
+    alert("토큰 주소를 입력하세요: ");
     return;
   }
 
@@ -52,15 +57,16 @@ async function fetchAndProcessTx() {
       ledger_index_min: ledgerMin.value,
       limit: limit.value,
     });
-    console.dir(response.result.transactions);
-    const txs = response.result.transactions; //as XRPLTransaction[];
-    console.dir(txs);
+
+    const txs = response.result.transactions;
+
     await formatData(txs);
 
-    console.log("");
-    getPoolData("all");
-    //const txs = response.result.transactions.map((tx) => tx.tx_json);
+    // const values = getValues(poolList.value);
+    // const dates = getValues("xrp");
+
     await client.disconnect();
+    updateChart();
   } catch (e) {
     console.log(e);
     alert("트랜잭션 조회 중 오류 발생");
@@ -119,7 +125,7 @@ function makedataset(tx: any, isXRP: boolean, isBuy: boolean) {
         });
 
         if (!nodeWrapper) {
-          console.log("ModifiedNode 없음");
+          console.log("ModifiedNode 없음", tx);
           return;
         }
 
@@ -128,85 +134,102 @@ function makedataset(tx: any, isXRP: boolean, isBuy: boolean) {
           (modifiedNode.PreviousFields.Balance -
             modifiedNode.FinalFields.Balance) /
           1000000;
-        const deliveredAmount = tx.meta.delivered_amount.value;
-        const effectiveRate = deliveredAmount / sendAmount;
+        const deliveredAmount = Math.abs(tx.meta.delivered_amount.value);
+        const effectiveRate = sendAmount / deliveredAmount;
         const poolId = "xrp";
         const beforePrice = getBeforePrice(poolId);
-        const value = [beforePrice, effectiveRate];
+        const value = [beforePrice, effectiveRate, beforePrice, effectiveRate];
         const type = tx.tx_json.TransactionType;
         setBeforePrice(poolId, effectiveRate);
-        addPoolData(poolId, [categoryData, value, type, tx]);
+        const info: payment = {
+          keyType: "buy",
+          account: tx.tx_json.Account,
+          fee: tx.tx_json.Fee / 1000000,
+          sendAmount: sendAmount,
+          deliveredAmount: deliveredAmount,
+        };
+        addPoolData(poolId, [categoryData, value, type, tx], info);
       } else {
         //이 토큰으로 xrp를 구매한 경우
         const nodeWrapper = tx.meta.AffectedNodes?.find((node: any) => {
-          if (node.hasOwnProperty("ModifiedNode")) {
-            const modified = node.ModifiedNode;
-            if (modified.LedgerEntryType === "RippleState") {
-              return (
-                modified.FinalFields.HighLimit.issuer === tx.tx_json.Account ||
-                modified.FinalFields.LowLimit.issuer === tx.tx_json.Account
-              );
-            }
-          }
+          const modified = node.ModifiedNode ?? node.DeletedNode;
+          return (
+            modified?.LedgerEntryType === "RippleState" &&
+            ((modified.FinalFields.HighLimit.issuer === tx.tx_json.Account &&
+              modified.FinalFields.LowLimit.issuer === tokenAdd.value) ||
+              (modified.FinalFields.LowLimit.issuer === tx.tx_json.Account &&
+                modified.FinalFields.HighLimit.issuer === tokenAdd.value))
+          );
         });
 
         if (!nodeWrapper) {
-          console.log("ModifiedNode 없음");
+          console.log("ModifiedNode 없음!!!", tx);
           return;
         }
-        const modified = nodeWrapper.ModifiedNode;
+
+        // 수정: nodeWrapper가 ModifiedNode인지 DeletedNode인지 확인
+        const modified = nodeWrapper.ModifiedNode ?? nodeWrapper.DeletedNode;
         const sendAmount =
           modified.PreviousFields.Balance.value -
           modified.FinalFields.Balance.value;
         const deliveredAmount = tx.meta.delivered_amount / 1000000;
-        const effectiveRate = deliveredAmount / sendAmount;
+        const effectiveRate = deliveredAmount / Math.abs(sendAmount);
         const poolId = "xrp";
         const beforePrice = getBeforePrice(poolId);
-        const value = [beforePrice, effectiveRate];
+        const value = [beforePrice, effectiveRate, effectiveRate, beforePrice];
         const type = tx.tx_json.TransactionType;
         setBeforePrice(poolId, effectiveRate);
-        addPoolData(poolId, [categoryData, value, type, tx]);
+        const info: payment = {
+          keyType: "sell",
+          account: tx.tx_json.Account,
+          fee: tx.tx_json.Fee / 1000000,
+          sendAmount: sendAmount,
+          deliveredAmount: deliveredAmount,
+        };
+        addPoolData(poolId, [categoryData, value, type, tx], info);
       }
     } else {
-      //token으로 다른 토큰을 구매한 경우
-      if (isBuy) {
+      //이 token으로 다른 토큰을 구매한 경우
+      if (!isBuy) {
         const nodeWrapper = tx.meta.AffectedNodes?.find((node: any) => {
-          if (node.hasOwnProperty("ModifiedNode")) {
-            const modified = node.ModifiedNode;
-            if (modified.LedgerEntryType === "RippleState") {
-              // 두 가지 조건 중 하나라도 만족하면 true를 반환합니다.
-              return (
-                (modified.FinalFields.HighLimit.issuer === tx.tx_json.Account &&
-                  modified.FinalFields.LowLimit.issuer === tokenAdd.value) ||
-                (modified.FinalFields.LowLimit.issuer === tx.tx_json.Account &&
-                  modified.FinalFields.HighLimit.issuer === tokenAdd.value)
-              );
-            }
-          }
+          const modified = node.ModifiedNode ?? node.DeletedNode;
+          return (
+            modified?.LedgerEntryType === "RippleState" &&
+            ((modified.FinalFields.HighLimit.issuer === tx.tx_json.Account &&
+              modified.FinalFields.LowLimit.issuer === tokenAdd.value) ||
+              (modified.FinalFields.LowLimit.issuer === tx.tx_json.Account &&
+                modified.FinalFields.HighLimit.issuer === tokenAdd.value))
+          );
         });
         if (!nodeWrapper) {
-          console.log("ModifiedNode 없음");
+          console.log("ModifiedNode 없음!!", tx);
           return;
         }
-        const modified = nodeWrapper.ModifiedNode;
+        const modified = nodeWrapper.ModifiedNode ?? nodeWrapper.DeletedNode;
         const sendAmount =
           modified.PreviousFields.Balance.value -
           modified.FinalFields.Balance.value;
         const deliveredAmount = tx.meta.delivered_amount.value;
-        const effectiveRate = deliveredAmount / sendAmount;
+        const effectiveRate = deliveredAmount / Math.abs(sendAmount);
         const poolId = `${tx.meta.delivered_amount.currency}_${tx.meta.delivered_amount.issuer}`;
         const beforePrice = getBeforePrice(poolId);
-        const value = [beforePrice, effectiveRate];
+        const value = [beforePrice, effectiveRate, effectiveRate, beforePrice];
         const type = tx.tx_json.TransactionType;
         setBeforePrice(poolId, effectiveRate);
-        addPoolData(poolId, [categoryData, value, type, tx]);
+        const info: payment = {
+          keyType: "sell",
+          account: tx.tx_json.Account,
+          fee: tx.tx_json.Fee / 1000000,
+          sendAmount: sendAmount,
+          deliveredAmount: deliveredAmount,
+        };
+        addPoolData(poolId, [categoryData, value, type, tx], info);
       } else {
         //다른 토큰을 판매하고 이 토큰을 얻은 경우
         const nodeWrapper = tx.meta.AffectedNodes?.find((node: any) => {
           if (node.hasOwnProperty("ModifiedNode")) {
             const modified = node.ModifiedNode;
             if (modified.LedgerEntryType === "RippleState") {
-              // 두 가지 조건 중 하나라도 만족하면 true를 반환합니다.
               return (
                 (modified.FinalFields.HighLimit.issuer === tx.tx_json.Account &&
                   modified.FinalFields.LowLimit.issuer ===
@@ -219,7 +242,7 @@ function makedataset(tx: any, isXRP: boolean, isBuy: boolean) {
           }
         });
         if (!nodeWrapper) {
-          console.log("ModifiedNode 없음");
+          console.log("ModifiedNode 없음!", tx);
           return;
         }
         const modified = nodeWrapper.ModifiedNode;
@@ -227,13 +250,20 @@ function makedataset(tx: any, isXRP: boolean, isBuy: boolean) {
           modified.PreviousFields.Balance.value -
           modified.FinalFields.Balance.value;
         const deliveredAmount = tx.meta.delivered_amount.value;
-        const effectiveRate = deliveredAmount / sendAmount;
+        const effectiveRate = Math.abs(sendAmount) / deliveredAmount;
         const poolId = `${tx.tx_json.SendMax.currency}_${tx.tx_json.SendMax.issuer}`;
         const beforePrice = getBeforePrice(poolId);
-        const value = [beforePrice, effectiveRate];
+        const value = [beforePrice, effectiveRate, beforePrice, effectiveRate];
         const type = tx.tx_json.TransactionType;
         setBeforePrice(poolId, effectiveRate);
-        addPoolData(poolId, [categoryData, value, type, tx]);
+        const info: payment = {
+          keyType: "buy",
+          account: tx.tx_json.Account,
+          fee: tx.tx_json.Fee / 1000000,
+          sendAmount: sendAmount,
+          deliveredAmount: deliveredAmount,
+        };
+        addPoolData(poolId, [categoryData, value, type, tx], info);
       }
     }
   } catch (e) {
@@ -243,82 +273,84 @@ function makedataset(tx: any, isXRP: boolean, isBuy: boolean) {
 
 async function formatData(txs: any[]) {
   txs.forEach((tx) => {
-    const type = tx.tx_json?.TransactionType;
-    if (type === "Payment") {
-      if (tx.tx_json.Account === tx.tx_json.Destination) {
-        const meta = tx.meta;
-        const tx_json = tx.tx_json;
+    try {
+      const type = tx.tx_json?.TransactionType;
+      if (type === "Payment") {
+        if (tx.tx_json.Account === tx.tx_json.Destination) {
+          const meta = tx.meta;
+          const tx_json = tx.tx_json;
 
-        //xrp를 보내고 토큰을 받음 (buy)
-        if (typeof tx_json?.SendMax === "string") {
-          if (meta.delivered_amount.issuer === tokenAdd.value) {
-            console.log("xrp로 구매", makedataset(tx, true, true));
-            //받는 토큰이 tokenAddress임 -> currency도 나중에 처리하게 수정해야함
-          } else {
-            console.log(
-              "xrp를 보냈는데 받은 토큰이 tokenAddress가 아님: ",
-              tx,
-              meta.delivered_amount.issuer,
-              tokenAdd.value
-            );
+          //xrp를 보내고 토큰을 받음 (buy)
+          if (typeof tx_json?.SendMax === "string") {
+            if (meta.delivered_amount.issuer === tokenAdd.value) {
+              makedataset(tx, true, true);
+              // console.log("xrp로 구매");
+              //받는 토큰이 tokenAddress임 -> currency도 나중에 처리하게 수정해야함
+            } else {
+              // console.log(
+              //   "xrp를 보냈는데 받은 토큰이 tokenAddress가 아님: ",
+              //   tx,
+              //   meta.delivered_amount.issuer,
+              //   tokenAdd.value
+              // );
+              const categoryData = formatDate(tx.tx_json.date);
+              const poolId = `${tx.meta.delivered_amount.currency}_${tx.meta.delivered_amount.issuer}`;
+              const beforePrice = getBeforePrice(poolId);
+              const value = [
+                beforePrice,
+                beforePrice,
+                beforePrice,
+                beforePrice,
+              ];
+              const info: route = {
+                keyType: "route",
+                account: tx.tx_json.Account,
+                fee: tx.tx_json.Fee / 1000000,
+              };
+              addPoolData(poolId, [categoryData, value, type, tx], info);
+            }
+          } else if (tx_json?.SendMax?.issuer === tokenAdd.value) {
+            //받은 토큰이 xrp
+            if (typeof meta.delivered_amount === "string") {
+              makedataset(tx, true, false);
+              // console.log("토큰 판매 후 xrp 받음");
+            } else {
+              makedataset(tx, false, true);
+              // console.log("이 토큰으로 다른 토큰 구매:  ");
+            }
+          } else if (meta.delivered_amount.issuer === tokenAdd.value) {
+            //다른 토큰에서 현재 토큰으로 변환
+            makedataset(tx, false, false);
+            // console.log("다른 토큰으로 이 토큰을 구매함");
           }
-        } else if (tx_json?.SendMax?.issuer === tokenAdd.value) {
-          //받은 토큰이 xrp
-          if (typeof meta.delivered_amount === "string") {
-            console.log("토큰 판매 후 xrp 받음", makedataset(tx, true, false));
-          } else {
-            console.log(
-              "이 토큰으로 다른 토큰 구매:  ",
-              makedataset(tx, false, true)
-            );
-          }
-        } else if (meta.delivered_amount.issuer === tokenAdd.value) {
-          //다른 토큰에서 현재 토큰으로 변환
-          console.log(
-            "다른 토큰으로 이 토큰을 구매함",
-            makedataset(tx, false, false)
-          );
+        } else {
+          const categoryData = formatDate(tx.tx_json.date);
+          const info: send = {
+            keyType: "send",
+            account: tx.tx_json.Account,
+            fee: tx.tx_json.Fee / 1000000,
+            deliveredAmount: tx.meta.delivered_amount.value,
+            Destination: tx.tx_json.Destination,
+          };
+          addtoAllPoolDatas([categoryData, type, tx], info);
         }
-      } else {
-        const categoryData = formatDate(tx.tx_json.date);
-        const poolId = `${tx.meta.delivered_amount.currency}_${tx.meta.delivered_amount.issuer}`;
-        const beforePrice = getBeforePrice(poolId);
-        const value = [beforePrice, beforePrice];
-        addPoolData(poolId, [categoryData, value, type, tx]);
+      } else if (type == "TrustSet") {
+        //price는 beforePrice에 있음
+        //모든 pool 배열에 저장
+      } else if (type == "OfferCancel" || type == "OfferCreate") {
+        //모든 pool 배열에 저장
       }
-    } else if (type == "TrustSet") {
-    } else if (type == "OfferCancel" || type == "OfferCreate") {
+    } catch (e) {
+      console.log("error", e, tx);
     }
   });
 }
 
 const chartDom = ref<HTMLDivElement | null>(null);
-
+// chart 인스턴스를 저장할 ref
+const myChart = ref<echarts.ECharts | null>(null);
 const upColor = "#00da3c";
 const downColor = "#ec0000";
-
-// rawData의 타입을 (string|number)[][]로 변경
-function splitData(rawData: (string | number)[][]) {
-  const categoryData: (string | number)[] = [];
-  const values: number[][] = [];
-  const volumes: (number | string)[][] = [];
-  for (let i = 0; i < rawData.length; i++) {
-    // 날짜(문자열)는 첫번째 항목
-    const row = [...rawData[i]]; // 원본 배열 변경 방지를 위해 복사
-    categoryData.push(row.splice(0, 1)[0]);
-    // 나머지는 숫자형 데이터라고 가정
-    values.push(row as number[]);
-    // 거래량 데이터: [index, volume, 조건 (open > close ? 1 : -1)]
-    // row[4]는 high, row[0]는 open, row[1]는 close (splitData 호출 후 row 순서는 [open, close, low, high, volume])
-    // 하지만 여기서는 dummyData 순서가 [date, open, close, low, high, volume]이므로
-    // row[3]은 low, row[2]은 close, row[1]은 open, row[4]는 high, row[5]는 volume.
-    // 조건을 간단하게 open > close 비교로 하겠습니다.
-    const open = row[0] as number;
-    const close = row[1] as number;
-    volumes.push([i, row[5], open > close ? 1 : -1]);
-  }
-  return { categoryData, values, volumes };
-}
 
 function calculateMA(dayCount: number, data: { values: number[][] }) {
   const result: (number | string)[] = [];
@@ -336,47 +368,32 @@ function calculateMA(dayCount: number, data: { values: number[][] }) {
   return result;
 }
 
-onMounted(() => {
-  if (!chartDom.value) return;
-  const myChart = echarts.init(chartDom.value);
+function updateChart() {
+  if (!myChart.value) return;
+  // getPoolData()를 이용해 처리된 데이터를 가져와서 새로운 옵션 구성
+  const option = getChartOption();
+  myChart.value.setOption(option, true);
+}
 
-  // 30개의 임의 데이터 생성
-  // 각 데이터 항목: [날짜, open, close, low, high, volume]
-  const dummyData: (string | number)[][] = [];
-  for (let i = 0; i < 10; i++) {
-    const day = i + 1;
-    const dayStr = day < 10 ? `0${day}` : `${day}`;
-    const date = `2023/01/${dayStr}`;
-    const open = 100 + i;
-    const close = open + 10; // 단순 증가
-    const low = open;
-    const high = close;
-    const volume = 1000 + i * 10;
-    dummyData.push([date, open, close, low, high, volume]);
-  }
-
-  // dummyData를 가공
-  console.dir(dummyData);
-  const data = splitData(dummyData);
-  console.dir(data);
-  const option = {
+function getChartOption() {
+  //일어나서 노트북으로 깃허브꺼 받고 데이터 형태 차이 보기
+  const txDate = getPoolData(poolList.value);
+  console.log("txDate", txDate);
+  console.log("categoryDate", txDate.categoryDate);
+  console.log("values", txDate.values[0]);
+  return {
     animation: false,
     legend: {
       bottom: 10,
       left: "center",
-      data: ["Transactions", "MA5", "MA10", "MA20", "MA30"],
+      data: ["Transactions"],
     },
     tooltip: {
       trigger: "axis",
-      axisPointer: {
-        type: "cross",
-      },
+      axisPointer: { type: "cross" },
       borderWidth: 1,
       borderColor: "#ccc",
-      // padding: 10,
-      textStyle: {
-        color: "#000",
-      },
+      textStyle: { color: "#000" },
       position: function (
         pos: number[],
         params: any,
@@ -385,83 +402,25 @@ onMounted(() => {
         size: any
       ) {
         const obj: Record<string, number> = { top: 10 };
-        // 차트의 왼쪽/오른쪽에 따라 위치 지정
         obj[pos[0] < size.viewSize[0] / 2 ? "left" : "right"] = 30;
         return obj;
       },
     },
-    axisPointer: {
-      link: [
-        {
-          xAxisIndex: "all",
-        },
-      ],
-      label: {
-        backgroundColor: "#777",
-      },
-    },
-    toolbox: {
-      feature: {
-        dataZoom: {
-          yAxisIndex: false,
-        },
-        brush: {
-          type: ["lineX", "clear"],
-        },
-      },
-    },
-    brush: {
-      xAxisIndex: "all",
-      brushLink: "all",
-      outOfBrush: {
-        colorAlpha: 0.1,
-      },
-    },
-    visualMap: {
-      show: false,
-      seriesIndex: 5,
-      dimension: 2,
-      pieces: [
-        {
-          value: 1,
-          color: downColor,
-        },
-        {
-          value: -1,
-          color: upColor,
-        },
-      ],
-    },
-    grid: [
-      {
-        // left: "10%",
-        // right: "8%",
-        height: "80%", // 메인 차트 영역을 60%로 늘림
-      },
-      {
-        // left: "10%",
-        // right: "8%",
-        top: "20%", // 보조 차트 영역의 위치도 약간 조정
-        height: "50%", // 보조 영역을 20%로 늘림
-      },
-    ],
     xAxis: [
       {
         type: "category",
-        data: data.categoryData,
+        data: txDate.categoryDate,
         boundaryGap: false,
         axisLine: { onZero: false },
         splitLine: { show: false },
         min: "dataMin",
         max: "dataMax",
-        axisPointer: {
-          z: 100,
-        },
+        axisPointer: { z: 100 },
       },
       {
         type: "category",
         gridIndex: 1,
-        data: data.categoryData,
+        data: txDate.categoryDate,
         boundaryGap: false,
         axisLine: { onZero: false },
         axisTick: { show: false },
@@ -474,9 +433,7 @@ onMounted(() => {
     yAxis: [
       {
         scale: true,
-        splitArea: {
-          show: true,
-        },
+        splitArea: { show: true },
       },
       {
         scale: true,
@@ -508,73 +465,67 @@ onMounted(() => {
       {
         name: "Transactions",
         type: "candlestick",
-        data: data.values,
+        data: txDate.values, // 실제 가격 데이터 배열
         barWidth: "100%",
         itemStyle: {
-          color: upColor,
-          color0: downColor,
-          borderColor: undefined,
-          borderColor0: undefined,
+          color: "#00da3c",
+          color0: "#ec0000",
         },
       },
-      {
-        name: "MA5",
-        type: "line",
-        data: calculateMA(5, data),
-        smooth: true,
-        lineStyle: {
-          opacity: 0.5,
-        },
-      },
-      {
-        name: "MA10",
-        type: "line",
-        data: calculateMA(10, data),
-        smooth: true,
-        lineStyle: {
-          opacity: 0.5,
-        },
-      },
-      {
-        name: "MA20",
-        type: "line",
-        data: calculateMA(20, data),
-        smooth: true,
-        lineStyle: {
-          opacity: 0.5,
-        },
-      },
-      {
-        name: "MA30",
-        type: "line",
-        data: calculateMA(30, data),
-        smooth: true,
-        lineStyle: {
-          opacity: 0.5,
-        },
-      },
-      {
-        name: "Volume",
-        type: "bar",
-        xAxisIndex: 1,
-        yAxisIndex: 1,
-        data: data.volumes,
-      },
+      // {
+      //   name: "MA5",
+      //   type: "line",
+      //   data: calculateMA(5, txDate),
+      //   smooth: true,
+      //   lineStyle: { opacity: 0.5 },
+      // },
+      // {
+      //   name: "MA10",
+      //   type: "line",
+      //   data: calculateMA(10, txDate),
+      //   smooth: true,
+      //   lineStyle: { opacity: 0.5 },
+      // },
+      // {
+      //   name: "MA20",
+      //   type: "line",
+      //   data: calculateMA(20, txDate),
+      //   smooth: true,
+      //   lineStyle: { opacity: 0.5 },
+      // },
+      // {
+      //   name: "MA30",
+      //   type: "line",
+      //   data: calculateMA(30, txDate),
+      //   smooth: true,
+      //   lineStyle: { opacity: 0.5 },
+      // },
     ],
   };
+}
 
-  myChart.setOption(option, true);
-
-  // 브러시(brush) 액션으로 특정 범위 강조 (예시: 임의의 날짜 범위)
-  myChart.dispatchAction({
-    type: "brush",
-    areas: [
-      {
-        brushType: "lineX",
-        coordRange: ["2023/01/10", "2023/01/20"],
-        xAxisIndex: 0,
-      },
-    ],
-  });
+onMounted(() => {
+  if (chartDom.value) {
+    myChart.value = echarts.init(chartDom.value);
+    const emptyOption = {
+      title: { text: "데이터 없음" },
+      xAxis: { data: [] },
+      yAxis: {},
+      series: [],
+    };
+    myChart.value.setOption(emptyOption);
+  }
 });
+
+// // 브러시(brush) 액션으로 특정 범위 강조 (예시: 임의의 날짜 범위)
+// myChart.dispatchAction({
+//   type: "brush",
+//   areas: [
+//     {
+//       brushType: "lineX",
+//       coordRange: ["2023/01/10", "2023/01/20"],
+//       xAxisIndex: 0,
+//     },
+//   ],
+// });
 </script>
