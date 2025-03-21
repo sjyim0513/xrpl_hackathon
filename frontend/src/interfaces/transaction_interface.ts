@@ -102,6 +102,7 @@ export interface PoolState {
   info: (payment | send | route | trustLine | offer)[];
 }
 
+//hash도 추가해서 캔들 클릭했을 때 링크 만들 수 있게
 export interface payment {
   keyType: string;
   account: string;

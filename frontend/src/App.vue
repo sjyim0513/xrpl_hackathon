@@ -1,6 +1,7 @@
 <template>
   <div>
     <h2>토큰 트랜잭션 기반 OHLC 차트</h2>
+    rBrgqvoz7SJvbvgQzSTyrJgzxeUuSsdQga
     <input v-model="tokenAdd" placeholder="토큰(발행자) 주소를 입력하세요" />
     <button @click="fetchAndProcessTx">조회하기</button>
   </div>
@@ -29,6 +30,9 @@ const ledgerMin = ref(-1);
 const ledgerMax = ref(-1);
 const poolList = ref("xrp");
 let chart: echarts.ECharts;
+let originalColoredData: any[] = [];
+let globalColoredData: any[] = [];
+let selectedAccount: string | null = null;
 
 function formatDate(date: number): string {
   const utc_sec = date + 946684800;
@@ -47,6 +51,14 @@ async function fetchAndProcessTx() {
     alert("토큰 주소를 입력하세요: ");
     return;
   }
+
+  chart.showLoading({
+    text: "데이터 로딩중...",
+    textColor: "#FAF9F6",
+    color: "#FAF9F6",
+    maskColor: "rgba(0, 0, 0, 0.5)",
+    zlevel: 0,
+  });
 
   try {
     await client.connect();
@@ -71,6 +83,8 @@ async function fetchAndProcessTx() {
   } catch (e) {
     console.log(e);
     alert("트랜잭션 조회 중 오류 발생");
+  } finally {
+    chart.hideLoading();
   }
 }
 
@@ -820,6 +834,47 @@ onMounted(() => {
 
   myChart.setOption(option);
 
+  chart.on("click", (params: any) => {
+    if (params.seriesType === "candlestick") {
+      const clickedAccount = params.data.account;
+      console.log("클릭된 account:", clickedAccount);
+
+      if (selectedAccount === clickedAccount) {
+        selectedAccount = null;
+
+        globalColoredData = originalColoredData.map((data) => ({ ...data }));
+      } else {
+        selectedAccount = clickedAccount;
+
+        const highlightedData: any[] = [];
+
+        globalColoredData = originalColoredData.map((dataPoint) => {
+          if (dataPoint.account === clickedAccount) {
+            highlightedData.push(dataPoint);
+            return {
+              ...dataPoint,
+              itemStyle: {
+                color: "#FFA500", // 주황색
+                borderWidth: 0,
+              },
+            };
+          }
+          return dataPoint;
+        });
+
+        console.dir(highlightedData);
+      }
+
+      chart.setOption({
+        series: [
+          {
+            data: globalColoredData,
+          },
+        ],
+      });
+    }
+  });
+
   myChart.dispatchAction({
     type: "brush",
     areas: [
@@ -836,29 +891,21 @@ function updateChart() {
   if (!chart) return;
   const txdata = getPoolData(poolList.value);
 
-  const coloredData = txdata.values.map((candle: number[], i: number) => {
+  originalColoredData = txdata.values.map((candle: number[], i: number) => {
     const candleType = txdata.info[i].keyType;
     let itemStyle = {};
 
     if (candleType === "send") {
       itemStyle = {
-        color: "#FF963A",
-        color0: "#FF963A",
+        color: "#3F46FF",
+        color0: "#3F46FF",
         borderWidth: 0,
       };
-    } else if (candleType === "route") {
-      itemStyle = {
-        color: "#000000",
-        color0: "#000000",
-        borderWidth: 0,
-      };
-    } else if (candleType === "trustLine") {
-      itemStyle = {
-        color: "#000000",
-        color0: "#000000",
-        borderWidth: 0,
-      };
-    } else if (candleType === "offer") {
+    } else if (
+      candleType === "route" ||
+      candleType === "trustLine" ||
+      candleType === "offer"
+    ) {
       itemStyle = {
         color: "#000000",
         color0: "#000000",
@@ -866,26 +913,22 @@ function updateChart() {
       };
     } else {
       if (candle[0] <= candle[1]) {
-        //상승
-        itemStyle = {
-          color: "#88D693",
-          borderWidth: 0,
-        };
+        // 상승
+        itemStyle = { color: "#88D693", borderWidth: 0 };
       } else {
-        //하락
-        itemStyle = {
-          color: "#F04866",
-          borderWidth: 0,
-        };
+        // 하락
+        itemStyle = { color: "#F04866", borderWidth: 0 };
       }
     }
 
     return {
       value: candle,
       itemStyle,
+      tx: txdata.tx[i],
+      account: txdata.info[i].account,
     };
   });
-
+  globalColoredData = originalColoredData.map((data) => ({ ...data }));
   const option = {
     backgroundColor: "#111111",
     tooltip: {
@@ -960,7 +1003,7 @@ function updateChart() {
       {
         name: "Transactions",
         type: "candlestick",
-        data: coloredData,
+        data: globalColoredData,
         barWidth: "100%",
       },
     ],
@@ -969,3 +1012,5 @@ function updateChart() {
   chart.setOption(option, false);
 }
 </script>
+
+<style></style>
