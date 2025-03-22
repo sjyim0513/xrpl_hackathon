@@ -71,8 +71,8 @@ function omitAccount(info: Record<string, any>): Record<string, any> {
 <style>
 .card-container {
   margin-left: 0px;
-  margin-top: -120px; /* 위로 올리기 */
-  background: linear-gradient(90deg, #11111100, #c7181800);
+  margin-top: -170px; /* 위로 올리기 */
+  background: linear-gradient(90deg, #11111100, #0c5a8522);
   border-radius: 15px;
   transition: transform 0.3s ease;
 }
@@ -87,6 +87,8 @@ function omitAccount(info: Record<string, any>): Record<string, any> {
   font-weight: 1000;
   margin-bottom: 5px;
   background: linear-gradient(90deg, #a0919100, #42424200);
+  text-shadow: 2px 2px 4px rgba(119, 200, 26, 0.576); /* 텍스트 그림자 */
+
   
 }
 
@@ -117,7 +119,7 @@ function omitAccount(info: Record<string, any>): Record<string, any> {
 .addressitem {
   background: linear-gradient(90deg, #00000000, #5f5f5f58);
   border-radius: 15px;
-  padding: 15px;
+  padding: 0px;
 }
 
 .buy {
@@ -148,7 +150,7 @@ function omitAccount(info: Record<string, any>): Record<string, any> {
 .link-container {
   display: inline-block;
   padding: 15px;
-  background: linear-gradient(90deg, rgba(7, 160, 38, 0), rgba(34, 211, 46, 0.544));
+  background: linear-gradient(90deg, rgba(7, 160, 38, 0), rgba(34, 211, 46, 0.635));
   border-radius: 15px;
   margin-top: 10px;
   width: 100%;
