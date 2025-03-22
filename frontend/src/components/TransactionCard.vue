@@ -16,9 +16,14 @@
           </div>
 
           <InfoComponent :info="omitAccount(transaction.info)" />
-          <a :href="`${baseurl}${transaction.tx.hash}/simple`" target="_blank"
-            >Link</a
-          >
+          &nbsp;&nbsp;&nbsp;&nbsp;
+
+          <!-- 수정된 부분: link-container를 a 태그로 감싸기 -->
+          <a :href="`${baseurl}${transaction.tx.hash}/simple`" target="_blank">
+            <div class="link-container">
+              <strong>Link</strong>
+            </div>
+          </a>
         </v-card>
       </v-window-item>
     </v-window>
@@ -80,6 +85,8 @@ function omitAccount(info: Record<string, any>): Record<string, any> {
 .card-info {
   margin: 10px;
   min-width: 300px;
+  border-radius: 15px !important;
+  background-color: #181818;
 }
 
 .card-plate {
@@ -114,4 +121,33 @@ function omitAccount(info: Record<string, any>): Record<string, any> {
 .trustLine {
   background-color: orange;
 }
+
+
+.link-container {
+  display: inline-block;
+  padding: 15px;
+  background: rgba(0, 0, 255, 0.329);
+  border-radius: 15px;
+  margin-top: 10px;
+  width: 100%; 
+  max-width: 300px; 
+  transition: transform 0.3s ease, box-shadow 0.3s ease; 
+  text-align: center; /* 텍스트 가운데 정렬 */
+}
+
+
+.link-container a {
+  color: #ffffff; 
+  font-size: 16px;
+  text-decoration: none;
+}
+
+
+.link-container:hover {
+  transform: scale(1.20); 
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3); 
+}
 </style>
+
+
+

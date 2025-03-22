@@ -1,32 +1,157 @@
 <template>
   <div class="header">
     <div class="logo-contaier">
-      <div class="logo">con-tracker</div>
+      <div class="logo">Con-tracker</div>
       <div class="search-Container">
         <input
           class="search-input"
           v-model="tokenAdd"
           placeholder=" 토큰(발행자) 주소를 입력하세요"
         />
-        <v-btn class="searchbtn" variant="outlined" @click="fetchAndProcessTx"
-          >조회하기</v-btn
-        >
+        <v-btn class="searchbtn" variant="outlined" @click="fetchAndProcessTx">Search</v-btn>
       </div>
     </div>
-    <div class="tokenlist-container">
+    
+  </div>
+<div class="tokenlist-container">
       <div class="tokenlist">
         <div class="from">{{ tokenAdd }}</div>
-        <span style="color: #ffffff">/</span>
+        <span style="color: #ffffff">&nbsp;&nbsp;</span>
         <div class="to">{{ poolList }}</div>
       </div>
     </div>
-  </div>
-
   <div class="main-container">
     <div class="chart" ref="chartDom" style="width: 75%; height: 90vh"></div>
     <TransactionCard :transactions="selectedTransactions" />
   </div>
 </template>
+
+<style scoped>
+.header {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(0, 0, 0, 0.3));
+  border-radius: 15px;
+  padding: 20px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+  
+  background-color: transparent;
+}
+
+
+  .logo-contaier {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .logo {
+    font-size: 44px;
+    color: #fff;
+    font-weight: bold;
+  }
+
+  .search-Container {
+    display: flex;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 30px;
+    padding: 5px 20px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+  }
+
+  .search-input {
+    padding: 10px;
+    margin-right: 10px;
+    border-radius: 20px;
+    border: 1px solid #aaa;
+    background-color: rgba(255, 255, 255, 0.1);
+    color: #fff;
+    font-size: 14px;
+  }
+
+  .searchbtn {
+    padding: 12px 20px;
+    border-radius: 30px;
+    background: linear-gradient(135deg, #4e54c8, #8f94fb);
+    color: white;
+    font-weight: bold;
+    box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.5);
+    transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+  }
+
+  .searchbtn:hover {
+    opacity: 1;
+  }
+
+  .searchbtn:active {
+    transform: scale(0.98);
+    box-shadow: 0px 8px 15px rgba(0, 0, 0, 0.7);
+  }
+
+  .searchbtn:focus {
+    outline: none;
+  }
+  .tokenlist-container {
+  margin-top: 10px;
+  background: linear-gradient(135deg, #07092f00, #080d3c00, #01084100, #9a7eff00);
+  border-radius: 10px;
+  padding: 20px; 
+  box-shadow: 0px 4px 15px rgba(67, 67, 67, 0.225);
+  display: flex;
+  flex-direction: column; 
+  align-items: flex-start; 
+  text-align: left; 
+}
+
+
+.tokenlist {
+  display: flex;
+  flex-direction: column; 
+  align-items: flex-start; 
+  width: 100%;
+  color: #811313;
+  font-size: 20px;
+  gap: 5px; 
+}
+
+
+.from, .to {
+  padding: 10px 20px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+  font-weight: bold;
+}
+
+
+  .from,
+  .to {
+    padding: 5px 10px;
+    background: rgba(107, 107, 107, 0.241);
+    border-radius: 10px;
+  }
+
+  .main-container {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 30px;
+    border-radius: 15px;
+    background: linear-gradient(135deg, #4242429d, #003b2b00, #8f94fb00, #9a7eff00);
+    padding: 20px;
+    box-shadow: 0px 4px 5px rgba(0, 0, 0, 0.5);
+  }
+
+  .chart {
+  border-radius: 10px;
+  background: linear-gradient(135deg, #0f338600, #4a5a8f00);
+  
+  box-shadow: 0px 40px 15px rgb(255, 255, 255);
+  overflow: hidden;
+  clip-path: polygon(0 0, 75% 0, 100% 10%, 100% 100%, 0 100%);
+
+}
+
+</style>
+
+
 
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
@@ -34,7 +159,7 @@ import * as echarts from "echarts";
 import { Client } from "xrpl";
 import { usePoolPriceState } from "./stores/usePoolPriceState";
 import type { payment, route, send } from "./interfaces/transaction_interface";
-import TokenPairList from "./components/TokenPairList.vue";
+/*import TokenPairList from "./components/TokenPairList.vue";*/
 import TransactionCard from "./components/TransactionCard.vue";
 
 const {
@@ -94,7 +219,7 @@ async function fetchAndProcessTx() {
     alert("토큰 주소를 입력하세요: ");
     return;
   }
-  processTokenString(tokenAdd.value);
+  
   chart.showLoading({
     text: "데이터 로딩중...",
     textColor: "#FAF9F6",
@@ -734,7 +859,7 @@ onMounted(() => {
         splitArea: {
           show: true,
           areaStyle: {
-            color: ["#111111", "#111111"],
+            color: "#111111",
           },
         },
       },
