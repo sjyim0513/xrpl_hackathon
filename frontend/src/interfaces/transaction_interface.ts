@@ -7,6 +7,11 @@ export interface AccountRootFinalFields {
   // 기타 계정 관련 필드가 있을 수 있음
 }
 
+export interface TokenInfo {
+  currency: string;
+  issuer: string;
+}
+
 // RippleState의 최종 상태 필드 (신뢰선 정보, 주로 IOU 관련)
 export interface RippleStateFinalFields {
   Balance: {
