@@ -1,12 +1,29 @@
 <template>
-  <div>
-    <h2>토큰 트랜잭션 기반 OHLC 차트</h2>
-    rBrgqvoz7SJvbvgQzSTyrJgzxeUuSsdQga
-    <input v-model="tokenAdd" placeholder="토큰(발행자) 주소를 입력하세요" />
-    <button @click="fetchAndProcessTx">조회하기</button>
+  <div class="header">
+    <div class="logo-contaier">
+      <div class="logo">con-tracker</div>
+      <div class="search-Container">
+        <input
+          class="search-input"
+          v-model="tokenAdd"
+          placeholder=" 토큰(발행자) 주소를 입력하세요"
+        />
+        <v-btn class="searchbtn" variant="outlined" @click="fetchAndProcessTx"
+          >조회하기</v-btn
+        >
+      </div>
+    </div>
+    <div class="tokenlist-container">
+      <div class="tokenlist">
+        <div class="from">{{ tokenAdd }}</div>
+        <span style="color: #ffffff">/</span>
+        <div class="to">{{ poolList }}</div>
+      </div>
+    </div>
   </div>
+
   <div class="main-container">
-    <div class="chart" ref="chartDom" style="width: 80%; height: 90vh"></div>
+    <div class="chart" ref="chartDom" style="width: 75%; height: 90vh"></div>
     <TransactionCard :transactions="selectedTransactions" />
   </div>
 </template>
@@ -17,6 +34,7 @@ import * as echarts from "echarts";
 import { Client } from "xrpl";
 import { usePoolPriceState } from "./stores/usePoolPriceState";
 import type { payment, route, send } from "./interfaces/transaction_interface";
+import TokenPairList from "./components/TokenPairList.vue";
 import TransactionCard from "./components/TransactionCard.vue";
 
 const {
@@ -38,6 +56,27 @@ let chart: echarts.ECharts;
 let originalColoredData: any[] = [];
 let globalColoredData: any[] = [];
 
+function decode(add: string) {
+  let str = "";
+  for (let i = 0; i < add.length; i += 2) {
+    const code = parseInt(add.substr(i, 2), 16);
+    if (code === 0) break;
+    str += String.fromCharCode(code);
+  }
+  return str;
+}
+
+function processTokenString(input: string) {
+  const parts = input.split(".");
+  if (parts.length < 2) {
+    throw new Error('입력 문자열에 "." 구분자가 없습니다.');
+  }
+  const hexPart = parts[0];
+  const issuer = parts[1];
+  const tokenName = decode(hexPart);
+  return { tokenName, issuer };
+}
+
 function formatDate(date: number): string {
   const utc_sec = date + 946684800;
   const d = new Date(utc_sec * 1000);
@@ -55,7 +94,7 @@ async function fetchAndProcessTx() {
     alert("토큰 주소를 입력하세요: ");
     return;
   }
-
+  processTokenString(tokenAdd.value);
   chart.showLoading({
     text: "데이터 로딩중...",
     textColor: "#FAF9F6",
@@ -78,7 +117,7 @@ async function fetchAndProcessTx() {
 
     const txs = response.result.transactions;
     await formatData(txs);
-
+    // console.dir(txs);
     // const values = getValues(poolList.value);
     // const dates = getValues("xrp");
 
@@ -90,42 +129,6 @@ async function fetchAndProcessTx() {
   } finally {
     chart.hideLoading();
   }
-}
-
-function computeCandleColors(
-  candles: number[][]
-): { value: number[]; itemStyle: { color: string; color0: string } }[] {
-  const result: {
-    value: number[];
-    itemStyle: { color: string; color0: string };
-  }[] = [];
-
-  for (let i = 0; i < candles.length; i++) {
-    const [open, close, low, high] = candles[i];
-    // 효과적인 가격: 여기서는 종가(close)를 사용 (open과 close가 같은 경우 동일)
-    const effectivePrice = close;
-    let color: string;
-
-    if (i === 0) {
-      // 첫 번째 캔들은 비교할 이전 값이 없으므로, 일반적인 규칙: close >= open이면 초록색, 아니면 빨간색.
-      color = close >= open ? "green" : "red";
-    } else {
-      // 만약 시가와 종가가 같다면, 이전 캔들의 효과적 가격과 비교
-      if (open === close) {
-        const prevEffectivePrice = result[i - 1].value[1]; // 이전 캔들의 종가를 효과적 가격으로 사용
-        color = effectivePrice < prevEffectivePrice ? "red" : "green";
-      } else {
-        // 일반적인 경우: close >= open이면 초록색, 그렇지 않으면 빨간색.
-        color = close >= open ? "green" : "red";
-      }
-    }
-
-    result.push({
-      value: candles[i],
-      itemStyle: { color: color, color0: color },
-    });
-  }
-  return result;
 }
 
 function makedataset(tx: any, isXRP: boolean, isBuy: boolean) {
@@ -921,10 +924,10 @@ function updateChart() {
     } else {
       if (candle[0] <= candle[1]) {
         // 상승
-        itemStyle = { color: "#88D693", borderWidth: 0 };
+        itemStyle = { color: "#089981", borderWidth: 0 };
       } else {
         // 하락
-        itemStyle = { color: "#F04866", borderWidth: 0 };
+        itemStyle = { color: "#F23645", borderWidth: 0 };
       }
     }
 
@@ -1038,5 +1041,50 @@ window.addEventListener("resize", () => {
   display: flex;
   align-items: center;
   margin-right: 20px;
+}
+
+.logo {
+  font-size: 40px;
+  color: #cecece;
+  text-align: center;
+}
+
+.logo-contaier {
+  display: flex;
+  align-items: center;
+  margin-left: 40px;
+}
+
+.search-Container {
+  display: flex;
+  align-items: center;
+  margin-top: 10px;
+}
+
+.search-input {
+  margin-left: 20px;
+  background-color: #333338;
+  border-radius: 5px;
+  width: fit-content;
+  height: 40px;
+  width: 300px;
+}
+
+.searchbtn {
+  margin-left: 10px;
+  color: #cecece !important;
+  background: transparent;
+}
+
+.tokenaddress {
+  color: #cecece;
+}
+
+.from {
+  color: #cecece;
+}
+
+.to {
+  color: #cecece;
 }
 </style>

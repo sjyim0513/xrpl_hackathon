@@ -50,9 +50,9 @@ export function usePoolPriceState() {
       const beforePrice = getBeforePrice(poolId);
       const value = [
         beforePrice,
-        beforePrice + 0.00000000001,
+        beforePrice + 0.00000000002,
         beforePrice,
-        beforePrice + 0.00000000001,
+        beforePrice + 0.00000000002,
       ];
       state[poolId].categoryDate.push(data[0]);
       state[poolId].values.push(value);
