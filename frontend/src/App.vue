@@ -120,7 +120,7 @@ function getOfferSequenceAndAmounts(tx: any): { sequences: number[]; amounts: nu
       offerNode = node.ModifiedNode;
     } else if (node.DeletedNode && node.DeletedNode.LedgerEntryType === "Offer") {
       offerNode = node.DeletedNode;
-    }
+    } 
     if (offerNode) {
       // Offer 노드에서 Sequence 값 추출 (NewFields 또는 FinalFields)
       const seq = offerNode.NewFields?.Sequence ?? offerNode.FinalFields?.Sequence;
@@ -1036,43 +1036,78 @@ onMounted(() => {
   myChart.setOption(option);
 
   chart.on("click", (params: any) => {
-    if (params.seriesType === "candlestick") {
-      const clickedAccount = params.data.account;
-      console.log("클릭된 account:", clickedAccount);
-      if (
-        selectedTransactions.value.length &&
-        selectedTransactions.value[0].account === clickedAccount
-      ) {
-        selectedTransactions.value = [];
-        globalColoredData = originalColoredData.map((data) => ({ ...data }));
-      } else {
-        selectedTransactions.value = globalColoredData.filter(
-          (dataPoint) => dataPoint.account === clickedAccount
-        );
-        globalColoredData = originalColoredData.map((dataPoint) => {
-          if (dataPoint.account === clickedAccount) {
-            // selectedTransactions.value.push(dataPoint.data);
-            return {
-              ...dataPoint,
-              itemStyle: {
-                color: "#FFA500", // 주황색
-                borderWidth: 0,
-              },
-            };
-          }
-          return dataPoint;
-        });
-      }
-      console.dir(selectedTransactions.value);
-      chart.setOption({
-        series: [
-          {
-            data: globalColoredData,
+  if (params.seriesType !== "candlestick") return;
+
+  const clicked = params.data;
+  const clickedAccount = clicked.account;
+  const clickedSequence = clicked.info?.offerSequence;
+
+  const isSameAccount =
+    selectedTransactions.value.length &&
+    selectedTransactions.value[0].account === clickedAccount;
+
+  if (isSameAccount) {
+    // 다시 클릭하면 초기화
+    selectedTransactions.value = [];
+    globalColoredData = originalColoredData.map((d) => ({ ...d }));
+  } else {
+    selectedTransactions.value = [clicked];
+
+    globalColoredData = originalColoredData.map((dataPoint) => {
+      const sameAccount = dataPoint.account === clickedAccount;
+      const sameSequence = dataPoint.info?.offerSequence === clickedSequence;  
+
+      if (sameAccount && dataPoint.tx === clicked.tx) {
+        // 🔴 클릭된 캔들
+        return {
+          ...dataPoint,
+          itemStyle: {
+            color: "#FF0000", // 빨간색
+            borderWidth: 2,
           },
-        ],
-      });
-    }
+        };
+      } else if (sameAccount && sameSequence) {
+        // 같은 account, sequence
+        return {
+          ...dataPoint,
+          itemStyle: {
+            color: "#80800", // 올리브색
+            borderWidth: 0,
+          },
+        };
+      }else if (sameAccount) {
+        // 🟠 같은 account
+        return {
+          ...dataPoint,
+          itemStyle: {
+            color: "#FFA500", // 주황색
+            borderWidth: 0,
+          },
+        };
+      } else if (sameSequence) {
+        // 🟢 같은 sequence
+        return {
+          ...dataPoint,
+          itemStyle: {
+            color: "#00B992", // 민트색
+            borderWidth: 0,
+          },
+        };
+      } else {
+        // 기본 색상 유지
+        return { ...dataPoint };
+      }
+    });
+  }
+
+  chart.setOption({
+    series: [
+      {
+        data: globalColoredData,
+      },
+    ],
   });
+});
 
   myChart.dispatchAction({
     type: "brush",
@@ -1086,7 +1121,7 @@ onMounted(() => {
   });
 });
 
-function updateChart() {
+function updateChart() { 
   if (!chart) return;
   const txdata = getPoolData(poolList.value);
 
@@ -1100,17 +1135,22 @@ function updateChart() {
         color0: "#3F46FF",
         borderWidth: 0,
       };
-    } else if (
-      candleType === "route" ||
-      candleType === "trustLine" ||
-      candleType === "offer"
-    ) {
+    } else if (candleType === "offerCreate" || candleType === "offerCancel") {
       itemStyle = {
+        color: "#00B992",
+        color0: "#00B992",
+        borderWidth: 0,
+      };
+    } else if(
+      candleType === "route" ||
+      candleType === "trustLine"){
+        itemStyle = {
         color: "#000000",
         color0: "#000000",
         borderWidth: 0,
       };
-    } else {
+    }
+    else {
       if (candle[0] <= candle[1]) {
         // 상승
         itemStyle = { color: "#88D693", borderWidth: 0 };
