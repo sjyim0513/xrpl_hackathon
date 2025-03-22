@@ -79,7 +79,8 @@ let originalColoredData: any[] = [];
 let globalColoredData: any[] = [];
 
 function calculatePoolId(tokenAdd: { value: string }, offer: any): string {
-  // takerget가 객체 형태인 경우 처리
+  // takerget가 객체 형태인 경우 처리'
+  console.log("offer", offer);
   if (
     typeof offer.takerget !== "string" &&
     offer.takerget.issuer !== tokenAdd.value
@@ -247,24 +248,24 @@ function parseTx(tx: any) {
     // TakerGets 처리: 문자열이면 XRPL 단위, 객체이면 currency, issuer, value 필드 변환
     let takerget: string | { currency: string; issuer: string; value: string };
     if (typeof txJson.TakerGets === "string") {
-      takerget = (Number(txJson.TakerGets) / 1000000).toString();
+      takerget = (txJson.TakerGets / 1000000).toString();
     } else {
       takerget = {
         currency: txJson.TakerGets.currency,
         issuer: txJson.TakerGets.issuer,
-        value: (Number(txJson.TakerGets.value) / 1000000).toString(),
+        value: (txJson.TakerGets.value / 1000000).toString(),
       };
     }
 
     // TakerPays 처리: 문자열이면 XRPL 단위, 객체이면 currency, issuer, value 필드 변환
     let takerpay: string | { currency: string; issuer: string; value: string };
     if (typeof txJson.TakerPays === "string") {
-      takerpay = (Number(txJson.TakerPays) / 1000000).toString();
+      takerpay = (txJson.TakerPays / 1000000).toString();
     } else {
       takerpay = {
         currency: txJson.TakerPays.currency,
         issuer: txJson.TakerPays.issuer,
-        value: (Number(txJson.TakerPays.value) / 1000000).toString(),
+        value: (txJson.TakerPays.value / 1000000).toString(),
       };
     }
 
@@ -793,14 +794,15 @@ async function formatData(txs: any[]) {
         if (isNotExistingOfferCreate(tx.tx_json?.OfferSequence)) {
           continue;
         }
-
+        const categoryData = formatDate(tx.tx_json.date);
         const info = parseTx(tx);
         const poolId = getPoolId(info.offerSequence);
-        addOfferDatas(tokenAdd.value, poolId, tx, tx.tx_json.date, info);
+        addOfferDatas(tokenAdd.value, poolId, tx, categoryData, info);
       } else if (type == "OfferCreate") {
+        const categoryData = formatDate(tx.tx_json.date);
         const info = parseTx(tx);
         const poolId = calculatePoolId(tokenAdd, info);
-        addOfferDatas(tokenAdd.value, poolId, tx, tx.tx_json.date, info);
+        addOfferDatas(tokenAdd.value, poolId, tx, categoryData, info);
       }
     } catch (e) {
       console.log("error", e, tx);

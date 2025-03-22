@@ -98,7 +98,7 @@ export function usePoolPriceState() {
       ReactiveOfferState[offerId].takerget.push(info.takerget);
       ReactiveOfferState[offerId].acount = info.acount;
     }
-
+    const poolState = getOrCreateTokenMap(tokenAdd)[poolId];
     const beforePrice = getBeforePrice(tokenAdd, poolId);
     const value = [
       beforePrice,
@@ -107,11 +107,11 @@ export function usePoolPriceState() {
       beforePrice + 0.00000000001,
     ];
 
-    state[poolId].categoryDate.push(date);
-    state[poolId].values.push(value);
-    state[poolId].type.push(info.keyType);
-    state[poolId].tx.push(tx);
-    state[poolId].info.push(info);
+    poolState.categoryDate.push(date);
+    poolState.values.push(value);
+    poolState.type.push(info.keyType);
+    poolState.tx.push(tx);
+    poolState.info.push(info);
   }
 
   function getOfferData(offerId: string) {
