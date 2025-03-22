@@ -26,13 +26,13 @@ const {
   addPoolData,
   addtoAllPoolDatas,
   getPoolData,
-  getOfferData,
   addOfferDatas,
+  getOfferData
 } = usePoolPriceState();
 
 const client = new Client("wss://s1.ripple.com/");
 const tokenAdd = ref("");
-const limit = ref(10000);
+const limit = ref(300);
 const ledgerMin = ref(-1);
 const ledgerMax = ref(-1);
 const poolList = ref("xrp");
@@ -143,64 +143,6 @@ function getOfferSequenceAndAmounts(tx: any): { sequences: number[]; amounts: nu
   return { sequences, amounts };
 }
 
-function parseTx(tx: any){
-  const txJson = tx.tx_json;
-  
-  // 공통 필드 처리 (수수료는 XRPL 단위로 10^6 나누기)
-  const fee = Number(txJson.fee) / 1000000;
-  const account = txJson.account;
-  const offerSequence = Number(txJson.sequence);
-
-  // TransactionType에 따른 분기 처리
-  if (txJson.TransactionType === "OfferCreate") {
-    // TakerGets 처리: 문자열이면 XRPL 단위, 객체이면 currency, issuer, value 필드 변환
-    let takerget: string | { currency: string; issuer: string; value: string };
-    if (typeof txJson.TakerGets === "string") {
-      takerget = (Number(txJson.TakerGets) / 1000000).toString();
-    } else {
-      takerget = {
-        currency: txJson.TakerGets.currency,
-        issuer: txJson.TakerGets.issuer,
-        value: (Number(txJson.TakerGets.value) / 1000000).toString(),
-      };
-    }
-
-    // TakerPays 처리: 문자열이면 XRPL 단위, 객체이면 currency, issuer, value 필드 변환
-    let takerpay: string | { currency: string; issuer: string; value: string };
-    if (typeof txJson.TakerPays === "string") {
-      takerpay = (Number(txJson.TakerPays) / 1000000).toString();
-    } else {
-      takerpay = {
-        currency: txJson.TakerPays.currency,
-        issuer: txJson.TakerPays.issuer,
-        value: (Number(txJson.TakerPays.value) / 1000000).toString(),
-      };
-    }
-
-    return {
-      keyType: "OfferCreate",
-      offerSequence,
-      account,
-      fee,
-      takerpay,
-      takerget,
-    } 
-  } else if (txJson.TransactionType === "OfferCancel") {
-    // OfferCancel의 경우 추가 데이터(tx_json.date, tx_json.OfferSequence 등)는 별도 처리가 가능하나,
-    // 인터페이스에 정의된 keyType, offerSequence, account, fee만 info 객체에 포함합니다.
-    return {
-      keyType: "OfferCancel",
-      offerSequence,
-      account,
-      fee,
-    } 
-  } else {
-    throw new Error("지원하지 않는 트랜잭션 타입입니다.");
-  }
-}
-
-
-
 async function fetchAndProcessTx() {
   if (!tokenAdd.value) {
     alert("토큰 주소를 입력하세요: ");
@@ -230,12 +172,7 @@ async function fetchAndProcessTx() {
     const txs = response.result.transactions;
     await formatData(txs);
 
-    
-    
-    
 
-   
-  
     // const values = getValues(poolList.value);
     // const dates = getValues("xrp");
 
@@ -286,7 +223,6 @@ function computeCandleColors(
 }
 
 function makedataset(tx: any, isXRP: boolean, isBuy: boolean) {
-  const {sequences, amounts} = getOfferSequenceAndAmounts(tx)
   try {
     const categoryData = formatDate(tx.tx_json.date);
     if (isXRP) {
@@ -299,9 +235,7 @@ function makedataset(tx: any, isXRP: boolean, isBuy: boolean) {
               node.ModifiedNode.FinalFields &&
               node.ModifiedNode.FinalFields.Account === tx.tx_json.Account
             );
-            
           }
-
         });
 
         if (!nodeWrapper) {
@@ -322,17 +256,12 @@ function makedataset(tx: any, isXRP: boolean, isBuy: boolean) {
         const value = [beforePrice, effectiveRate, beforePrice, effectiveRate];
         const type = tx.tx_json.TransactionType;
         setBeforePrice(poolId, effectiveRate);
-
-        
         const info: payment = {
           keyType: "buy",
           account: tx.tx_json.Account,
           fee: tx.tx_json.Fee / 1000000,
           sendAmount: sendAmount,
           deliveredAmount: deliveredAmount,
-          offerSequence: sequences,
-          offerAmount: amounts,
-
         };
         addPoolData(poolId, [categoryData, value, type, tx], info);
       } else {
@@ -367,15 +296,12 @@ function makedataset(tx: any, isXRP: boolean, isBuy: boolean) {
         const value = [beforePrice, effectiveRate, effectiveRate, beforePrice];
         const type = tx.tx_json.TransactionType;
         setBeforePrice(poolId, effectiveRate);
-
         const info: payment = {
           keyType: "sell",
           account: tx.tx_json.Account,
           fee: tx.tx_json.Fee / 1000000,
           sendAmount: sendAmount,
           deliveredAmount: deliveredAmount,
-          offerSequence: sequences,
-          offerAmount: amounts,
         };
         addPoolData(poolId, [categoryData, value, type, tx], info);
       }
@@ -409,15 +335,12 @@ function makedataset(tx: any, isXRP: boolean, isBuy: boolean) {
         const value = [beforePrice, effectiveRate, effectiveRate, beforePrice];
         const type = tx.tx_json.TransactionType;
         setBeforePrice(poolId, effectiveRate);
-
         const info: payment = {
           keyType: "sell",
           account: tx.tx_json.Account,
           fee: tx.tx_json.Fee / 1000000,
           sendAmount: sendAmount,
           deliveredAmount: deliveredAmount,
-          offerSequence: sequences,
-          offerAmount: amounts,
         };
         addPoolData(poolId, [categoryData, value, type, tx], info);
       } else {
@@ -461,9 +384,6 @@ function makedataset(tx: any, isXRP: boolean, isBuy: boolean) {
           fee: tx.tx_json.Fee / 1000000,
           sendAmount: sendAmount,
           deliveredAmount: deliveredAmount,
-          offerSequence: sequences,
-          offerAmount: amounts,
-          
         };
         addPoolData(poolId, [categoryData, value, type, tx], info);
       }
@@ -487,7 +407,6 @@ async function formatData(txs: any[]) {
           if (typeof tx_json?.SendMax === "string") {
             if (meta.delivered_amount.issuer === tokenAdd.value) {
               makedataset(tx, true, true);
-  
               // console.log("xrp로 구매");
               //받는 토큰이 tokenAddress임 -> currency도 나중에 처리하게 수정해야함
             } else {
@@ -537,7 +456,7 @@ async function formatData(txs: any[]) {
           };
           addtoAllPoolDatas([categoryData, type, tx], info);
         }
-      } else if (type == "TrustSet") {
+      } else if (type === "TrustSet") {
         //price는 beforePrice에 있음
         //모든 pool 배열에 저장
       } else if (type == "OfferCancel") {
@@ -1036,43 +955,78 @@ onMounted(() => {
   myChart.setOption(option);
 
   chart.on("click", (params: any) => {
-    if (params.seriesType === "candlestick") {
-      const clickedAccount = params.data.account;
-      console.log("클릭된 account:", clickedAccount);
-      if (
-        selectedTransactions.value.length &&
-        selectedTransactions.value[0].account === clickedAccount
-      ) {
-        selectedTransactions.value = [];
-        globalColoredData = originalColoredData.map((data) => ({ ...data }));
-      } else {
-        selectedTransactions.value = globalColoredData.filter(
-          (dataPoint) => dataPoint.account === clickedAccount
-        );
-        globalColoredData = originalColoredData.map((dataPoint) => {
-          if (dataPoint.account === clickedAccount) {
-            // selectedTransactions.value.push(dataPoint.data);
-            return {
-              ...dataPoint,
-              itemStyle: {
-                color: "#FFA500", // 주황색
-                borderWidth: 0,
-              },
-            };
-          }
-          return dataPoint;
-        });
-      }
-      console.dir(selectedTransactions.value);
-      chart.setOption({
-        series: [
-          {
-            data: globalColoredData,
+  if (params.seriesType !== "candlestick") return;
+
+  const clicked = params.data;
+  const clickedAccount = clicked.account;
+  const clickedSequence = clicked.info?.offerSequence;
+
+  const isSameAccount =
+    selectedTransactions.value.length &&
+    selectedTransactions.value[0].account === clickedAccount;
+
+  if (isSameAccount) {
+    // 다시 클릭하면 초기화
+    selectedTransactions.value = [];
+    globalColoredData = originalColoredData.map((d) => ({ ...d }));
+  } else {
+    selectedTransactions.value = [clicked];
+
+    globalColoredData = originalColoredData.map((dataPoint) => {
+      const sameAccount = dataPoint.account === clickedAccount;
+      const sameSequence = dataPoint.info?.offerSequence === clickedSequence;  
+
+      if (sameAccount && dataPoint.tx === clicked.tx) {
+        // 🔴 클릭된 캔들
+        return {
+          ...dataPoint,
+          itemStyle: {
+            color: "#FF0000", // 빨간색
+            borderWidth: 2,
           },
-        ],
-      });
-    }
+        };
+      } else if (sameAccount && sameSequence) {
+        // 같은 account, sequence
+        return {
+          ...dataPoint,
+          itemStyle: {
+            color: "#80800", // 올리브색
+            borderWidth: 0,
+          },
+        };
+      }else if (sameAccount) {
+        // 🟠 같은 account
+        return {
+          ...dataPoint,
+          itemStyle: {
+            color: "#FFA500", // 주황색
+            borderWidth: 0,
+          },
+        };
+      } else if (sameSequence) {
+        // 🟢 같은 sequence
+        return {
+          ...dataPoint,
+          itemStyle: {
+            color: "#00B992", // 민트색
+            borderWidth: 0,
+          },
+        };
+      } else {
+        // 기본 색상 유지
+        return { ...dataPoint };
+      }
+    });
+  }
+
+  chart.setOption({
+    series: [
+      {
+        data: globalColoredData,
+      },
+    ],
   });
+});
 
   myChart.dispatchAction({
     type: "brush",
@@ -1086,7 +1040,7 @@ onMounted(() => {
   });
 });
 
-function updateChart() {
+function updateChart() { 
   if (!chart) return;
   const txdata = getPoolData(poolList.value);
 
@@ -1100,17 +1054,22 @@ function updateChart() {
         color0: "#3F46FF",
         borderWidth: 0,
       };
-    } else if (
-      candleType === "route" ||
-      candleType === "trustLine" ||
-      candleType === "offer"
-    ) {
+    } else if (candleType === "offerCreate" || candleType === "offerCancel") {
       itemStyle = {
+        color: "#00B992",
+        color0: "#00B992",
+        borderWidth: 0,
+      };
+    } else if(
+      candleType === "route" ||
+      candleType === "trustLine"){
+        itemStyle = {
         color: "#000000",
         color0: "#000000",
         borderWidth: 0,
       };
-    } else {
+    }
+    else {
       if (candle[0] <= candle[1]) {
         // 상승
         itemStyle = { color: "#88D693", borderWidth: 0 };

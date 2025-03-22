@@ -92,8 +92,8 @@ export function usePoolPriceState() {
     state[poolId].info.push(info);
     }
 
-  function getOfferData(offerId: string) {
-    return ReactiveOfferState[offerId]
+  function getOfferData() {
+    return ReactiveOfferState;
   }
   
 
