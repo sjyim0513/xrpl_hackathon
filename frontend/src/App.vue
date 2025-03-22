@@ -5,7 +5,10 @@
     <input v-model="tokenAdd" placeholder="토큰(발행자) 주소를 입력하세요" />
     <button @click="fetchAndProcessTx">조회하기</button>
   </div>
-  <div ref="chartDom" style="width: 100%; height: 1300px"></div>
+  <div class="main-container">
+    <div class="chart" ref="chartDom" style="width: 80%; height: 90vh"></div>
+    <TransactionCard :transactions="selectedTransactions" />
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -14,6 +17,7 @@ import * as echarts from "echarts";
 import { Client } from "xrpl";
 import { usePoolPriceState } from "./stores/usePoolPriceState";
 import type { payment, route, send } from "./interfaces/transaction_interface";
+import TransactionCard from "./components/TransactionCard.vue";
 
 const {
   getBeforePrice,
@@ -29,10 +33,10 @@ const limit = ref(300);
 const ledgerMin = ref(-1);
 const ledgerMax = ref(-1);
 const poolList = ref("xrp");
+const selectedTransactions = ref<any[]>([]);
 let chart: echarts.ECharts;
 let originalColoredData: any[] = [];
 let globalColoredData: any[] = [];
-let selectedAccount: string | null = null;
 
 function formatDate(date: number): string {
   const utc_sec = date + 946684800;
@@ -134,6 +138,7 @@ function makedataset(tx: any, isXRP: boolean, isBuy: boolean) {
           if (node.hasOwnProperty("ModifiedNode")) {
             return (
               node.ModifiedNode.LedgerEntryType === "AccountRoot" &&
+              node.ModifiedNode.FinalFields &&
               node.ModifiedNode.FinalFields.Account === tx.tx_json.Account
             );
           }
@@ -171,6 +176,7 @@ function makedataset(tx: any, isXRP: boolean, isBuy: boolean) {
           const modified = node.ModifiedNode ?? node.DeletedNode;
           return (
             modified?.LedgerEntryType === "RippleState" &&
+            modified.FinalFields &&
             ((modified.FinalFields.HighLimit.issuer === tx.tx_json.Account &&
               modified.FinalFields.LowLimit.issuer === tokenAdd.value) ||
               (modified.FinalFields.LowLimit.issuer === tx.tx_json.Account &&
@@ -212,6 +218,7 @@ function makedataset(tx: any, isXRP: boolean, isBuy: boolean) {
           const modified = node.ModifiedNode ?? node.DeletedNode;
           return (
             modified?.LedgerEntryType === "RippleState" &&
+            modified.FinalFields &&
             ((modified.FinalFields.HighLimit.issuer === tx.tx_json.Account &&
               modified.FinalFields.LowLimit.issuer === tokenAdd.value) ||
               (modified.FinalFields.LowLimit.issuer === tx.tx_json.Account &&
@@ -249,7 +256,9 @@ function makedataset(tx: any, isXRP: boolean, isBuy: boolean) {
             const modified = node.ModifiedNode;
             if (modified.LedgerEntryType === "RippleState") {
               return (
-                (modified.FinalFields.HighLimit.issuer === tx.tx_json.Account &&
+                (modified.FinalFields &&
+                  modified.FinalFields.HighLimit.issuer ===
+                    tx.tx_json.Account &&
                   modified.FinalFields.LowLimit.issuer ===
                     tx.tx_json.SendMax.issuer) ||
                 (modified.FinalFields.LowLimit.issuer === tx.tx_json.Account &&
@@ -376,12 +385,12 @@ onMounted(() => {
     backgroundColor: "#111111",
     animation: false,
     legend: {
-      bottom: 30,
+      bottom: 70,
       left: "center",
       data: ["Transactions"],
       textStyle: {
         color: "#FAF9F6",
-        fontSize: 15,
+        fontSize: 13,
       },
     },
     tooltip: {
@@ -460,14 +469,14 @@ onMounted(() => {
     // },
     grid: [
       {
-        left: "10%",
-        right: "8%",
-        height: "80%", // 메인 차트 영역을 60%로 늘림
+        left: "8%",
+        right: "5%",
+        height: "70%", // 메인 차트 영역을 60%로 늘림
         backgroundColor: "#111111",
       },
       {
-        left: "10%",
-        right: "8%",
+        left: "8%",
+        right: "5%",
         top: "20%", // 보조 차트 영역의 위치도 약간 조정
         height: "50%", // 보조 영역을 20%로 늘림
         backgroundColor: "#111111",
@@ -688,11 +697,11 @@ onMounted(() => {
     yAxis: [
       {
         scale: true,
-        splitNumber: 20,
+        splitNumber: 10,
         splitLine: {
           show: true,
           lineStyle: {
-            color: "#1E1E1F", // 예: 초록색
+            color: "#1E1E1F",
           },
         },
         splitArea: {
@@ -838,19 +847,19 @@ onMounted(() => {
     if (params.seriesType === "candlestick") {
       const clickedAccount = params.data.account;
       console.log("클릭된 account:", clickedAccount);
-
-      if (selectedAccount === clickedAccount) {
-        selectedAccount = null;
-
+      if (
+        selectedTransactions.value.length &&
+        selectedTransactions.value[0].account === clickedAccount
+      ) {
+        selectedTransactions.value = [];
         globalColoredData = originalColoredData.map((data) => ({ ...data }));
       } else {
-        selectedAccount = clickedAccount;
-
-        const highlightedData: any[] = [];
-
+        selectedTransactions.value = globalColoredData.filter(
+          (dataPoint) => dataPoint.account === clickedAccount
+        );
         globalColoredData = originalColoredData.map((dataPoint) => {
           if (dataPoint.account === clickedAccount) {
-            highlightedData.push(dataPoint);
+            // selectedTransactions.value.push(dataPoint.data);
             return {
               ...dataPoint,
               itemStyle: {
@@ -861,10 +870,8 @@ onMounted(() => {
           }
           return dataPoint;
         });
-
-        console.dir(highlightedData);
       }
-
+      console.dir(selectedTransactions.value);
       chart.setOption({
         series: [
           {
@@ -926,6 +933,7 @@ function updateChart() {
       itemStyle,
       tx: txdata.tx[i],
       account: txdata.info[i].account,
+      info: txdata.info[i],
     };
   });
   globalColoredData = originalColoredData.map((data) => ({ ...data }));
@@ -979,7 +987,15 @@ function updateChart() {
         data: txdata.categoryDate,
         // boundaryGap: false,
         axisLine: { onZero: false },
-        splitLine: { show: false },
+        splitLine: {
+          show: true,
+          lineStyle: {
+            color: "#1E1E1F",
+          },
+        },
+        axisLabel: {
+          color: "#FAF9F6",
+        },
         min: "dataMin",
         max: "dataMax",
         axisPointer: {
@@ -1011,6 +1027,16 @@ function updateChart() {
 
   chart.setOption(option, false);
 }
+
+window.addEventListener("resize", () => {
+  chart.resize();
+});
 </script>
 
-<style></style>
+<style>
+.main-container {
+  display: flex;
+  align-items: center;
+  margin-right: 20px;
+}
+</style>

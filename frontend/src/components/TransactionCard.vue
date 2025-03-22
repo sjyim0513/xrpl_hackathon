@@ -1,39 +1,80 @@
 <template>
-  <v-card v-if="transactions.length" class="ma-4" outlined>
-    <v-card-title>선택된 트랜잭션 정보</v-card-title>
-    <v-card-text>
-      <v-list dense>
-        <v-list-item v-for="(tx, index) in transactions" :key="index">
-          <v-list-item-content>
-            <v-list-item-title>{{ tx.account }}</v-list-item-title>
-            <v-list-item-subtitle>
-              {{ formatTxInfo(tx) }}
-            </v-list-item-subtitle>
-          </v-list-item-content>
-        </v-list-item>
-      </v-list>
-    </v-card-text>
-  </v-card>
+  <div class="card-container">
+    <div class="address">
+      <div class="account">Account</div>
+      {{ effectiveTransactions[0].account }}
+    </div>
+    <v-window class="card-window" v-model="onboarding" show-arrows="hover">
+      <v-window-item
+        v-for="(transaction, index) in effectiveTransactions"
+        :key="`card-${index}`"
+        :value="index"
+      >
+        <v-card class="card-info" elevation="2" theme="dark">
+          <div class="card22">{{ transaction.info.keyType }}</div>
+          <a :href="`${baseurl}${transaction.tx.hash}/simple`" target="_blank"
+            >Link</a
+          >
+          <div class="card22">{{ transaction.info.keyType }}</div>
+        </v-card>
+      </v-window-item>
+    </v-window>
+  </div>
 </template>
 
 <script setup lang="ts">
-import { defineProps } from "vue";
+import { computed, ref } from "vue";
 
-interface TxData {
-  account: string;
-  // tx 객체에 포함된 추가 필드들
-  Account: string;
-  Fee: string;
-  deliveredAmount?: string;
-  // 필요한 필드 추가…
-}
-
+const onboarding = ref(0);
+const baseurl = "https://livenet.xrpl.org/transactions/";
 const props = defineProps<{
-  transactions: TxData[];
+  transactions: any[];
 }>();
 
-function formatTxInfo(tx: TxData): string {
-  // 예시: Account, Fee, deliveredAmount 등 원하는 정보를 포맷
-  return `Account: ${tx.Account}, Fee: ${tx.Fee}`;
-}
+const effectiveTransactions = computed(() => {
+  if (props.transactions && props.transactions.length > 0) {
+    console.log("props", props.transactions[0].tx);
+    return props.transactions;
+  } else {
+    return [
+      {
+        account: "Dummy Account",
+        // 필요하다면 추가 필드를 넣을 수 있음
+        info: { keyType: "" },
+        tx: { hash: "" },
+        value: { account: "Dummy Account" },
+      },
+    ];
+  }
+});
 </script>
+
+<style>
+.card-container {
+  /* height: 100%; */
+}
+
+.account {
+  font-size: 19px;
+  font-weight: 1000;
+}
+
+.address {
+  margin: 10px;
+  height: 100px;
+  border-radius: 10px;
+  background: #cecece;
+  padding: 10px;
+}
+
+.card-info {
+  margin: 10px;
+  min-width: 300px;
+  height: 500px;
+}
+
+.card22 {
+  background: #cecece;
+  padding: 20px;
+}
+</style>
