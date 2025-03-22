@@ -49,7 +49,6 @@ import type {
   send,
   TokenInfo,
 } from "./interfaces/transaction_interface";
-import TokenPairList from "./components/TokenPairList.vue";
 import TransactionCard from "./components/TransactionCard.vue";
 import { error } from "echarts/types/src/util/log.js";
 import { error } from "echarts/types/src/util/log.js";
@@ -293,11 +292,7 @@ async function fetchAndProcessTx() {
   try {
     await client.connect();
     const account = tokenAdd.value;
-    // tokenMaps(상위 관리 객체)에서 해당 계정의 state를 가져오거나 새로 만듭니다.
-    const tokenState = getOrCreateTokenMap(account);
-    console.log("tokenState", tokenState);
     const inputState = getPoolData(tokenAdd.value, account);
-    console.log("inputState", inputState);
     const storedTxs = inputState ? inputState.tx : [];
     if (storedTxs.length > 0) {
       const latestTx = storedTxs[storedTxs.length - 1];
@@ -322,7 +317,6 @@ async function fetchAndProcessTx() {
         const response = await client.request(request);
         const txs = response.result.transactions;
         allTxs = allTxs.concat(txs);
-        console.log("전체 allTxs 개수:", allTxs.length);
         marker = response.result.marker as string | undefined;
       } while (marker);
     } else {
