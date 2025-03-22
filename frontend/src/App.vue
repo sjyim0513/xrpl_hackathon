@@ -332,7 +332,6 @@ function makedataset(tx: any, isXRP: boolean, isBuy: boolean) {
           deliveredAmount: deliveredAmount,
           offerSequence: sequences,
           offerAmount: amounts,
-
         };
         addPoolData(poolId, [categoryData, value, type, tx], info);
       } else {
