@@ -69,7 +69,7 @@ export function usePoolPriceState() {
     if (typeof info.takerget !== "string" || typeof info.takerpay !== "string") {
       
     }
-    const poolId =  //curr issuer
+    const poolId =  
     const offerId = info.keyType + info.offerSequence
 
     if (info.keyType == "offerCreate") {

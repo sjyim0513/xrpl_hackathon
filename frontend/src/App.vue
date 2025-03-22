@@ -446,7 +446,10 @@ async function formatData(txs: any[]) {
         //price는 beforePrice에 있음
         //모든 pool 배열에 저장
       } else if (type == "OfferCancel" || type == "OfferCreate") {
-        getOfferData()
+        tokenAdd.value
+        const date = tx.tx_json.date
+        const issuer = tx.tx_json.
+
       }
     } catch (e) {
       console.log("error", e, tx);
