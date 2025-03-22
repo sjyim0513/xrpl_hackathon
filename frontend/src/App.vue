@@ -8,174 +8,38 @@
           v-model="tokenAdd"
           placeholder=" 토큰(발행자) 주소를 입력하세요"
         />
-        <v-btn class="searchbtn" variant="outlined" @click="fetchAndProcessTx">Search</v-btn>
+        <v-btn class="searchbtn" variant="outlined" @click="fetchAndProcessTx"
+          >Search</v-btn
+        >
       </div>
     </div>
-    
   </div>
-<div class="tokenlist-container">
-      <div class="tokenlist">
-
-  
-
-        <div class="from">{{ currency }}</div>
-        <span style="color: #cecece; margin: 0 10px 0 10px"></span>
-        <div class="to">
-          <v-select
-            v-model="poolList"
-            :items="stateKeys"
-            variant="plain"
-            hide-details
-            density="compact"
-            append-icon=""
-            class="no-border-select center-text-select"
-          ></v-select>
-        </div>
-
+  <div class="tokenlist-container">
+    <div class="tokenlist">
+      <div class="from">{{ currency }}</div>
+      <span style="color: #cecece; margin: 0 10px 0 10px"></span>
+      <div class="to">
+        <v-select
+          v-model="poolList"
+          :items="stateKeys.processedKeys"
+          variant="plain"
+          hide-details
+          density="compact"
+          append-icon=""
+          class="no-border-select center-text-select"
+          @update:modelValue="updateChart"
+        ></v-select>
       </div>
     </div>
+  </div>
   <div class="main-container">
     <div class="chart" ref="chartDom" style="width: 75%; height: 90vh"></div>
     <TransactionCard :transactions="selectedTransactions" />
   </div>
 </template>
 
-<style scoped>
-.header {
-  background: linear-gradient(90deg, #11111100, #0c5a8522);
-  border-radius: 15px;
-  padding: 0px;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
-  
-  background-color: transparent;
-}
-
-
-  .logo-contaier {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-
-  .logo {
-  font-size: 44px;
-  font-weight: bold;
-  background: linear-gradient(to right, #2ece61c8, #115d0449); /* 그라데이션 색상 */
-  -webkit-background-clip: text; /* 배경을 텍스트에 맞게 자르기 */
-  color: transparent;
-}
-
-
-  .search-Container {
-    display: flex;
-    align-items: center;
-    background: rgba(255, 255, 255, 0);
-    border-radius: 30px;
-    padding: 2px 20px;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0);
-  }
-
-  .search-input {
-    padding: 10px;
-    margin-right: 10px;
-    border-radius: 20px;
-    border: 1px solid #00000070;
-    background-color: rgba(255, 255, 255, 0.1);
-    color: #fff;
-    font-size: 14px;
-  }
-
-  .searchbtn {
-    padding: 12px 20px;
-    border-radius: 30px;
-    background: linear-gradient(135deg, #02871489, #00000057);
-    color: rgb(0, 0, 0);
-    border: 1px solid #00000070;
-    font-weight: bold;
-    box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.5);
-    transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
-  }
-
-  .searchbtn:hover {
-  transform: scale(1.05); 
-  box-shadow: 0px 8px 15px rgba(0, 0, 0, 0.3); 
-}
-
-
-  .searchbtn:active {
-    transform: scale(1.2);
-    box-shadow: 0px 8px 15px rgba(0, 0, 0, 0.7);
-  }
-
-  .searchbtn:focus {
-    outline: none;
-  }
-  .tokenlist-container {
-  margin-top: 10px;
-  background: linear-gradient(135deg, #07092f00, #080d3c00, #01084100, #9a7eff00);
-  border-radius: 10px;
-  padding: 0px; 
-  box-shadow: 0px 4px 15px rgba(67, 67, 67, 0.225);
-  display: flex;
-  flex-direction: column; 
-  align-items: flex-start; 
-  text-align: left; 
-}
-
-
-.tokenlist {
-  display: flex;
-  flex-direction: column; 
-  align-items: flex-start; 
-  width: 100%;
-  color: #811313;
-  font-size: 20px;
-  gap: 5px; 
-}
-
-
-.from, .to {
-  padding: 10px 20px;
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 10px;
-  font-weight: bold;
-}
-
-
-  .from,
-  .to {
-    padding: 5px 10px;
-    background: linear-gradient(to right, rgba(129, 129, 129, 0), rgba(61, 61, 61, 0.164));
-
-    border-radius: 10px;
-  }
-
-  .main-container {
-    display: flex;
-    justify-content: space-between;
-    margin-top: 30px;
-    border-radius: 15px;
-    background: linear-gradient(90deg, #13829e00, #0c5b8500);
-    padding: 20px;
-    box-shadow: 0px 4px 5px rgba(0, 0, 0, 0.5);
-  }
-
-  .chart {
-  border-radius: 10px;
-  background: linear-gradient(135deg, #00000000, #4a5a8f00) ;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
- 
-  overflow: hidden;
-  clip-path: polygon(0 0, 75% 0, 100% 10%, 100% 100%, 0 100%);
-
-}
-
-</style>
-
-
-
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import * as echarts from "echarts";
 import { Client, type AccountTxRequest } from "xrpl";
 import { usePoolPriceState } from "./stores/usePoolPriceState";
@@ -185,7 +49,6 @@ import type {
   send,
   TokenInfo,
 } from "./interfaces/transaction_interface";
-import TokenPairList from "./components/TokenPairList.vue";
 import TransactionCard from "./components/TransactionCard.vue";
 
 const {
@@ -201,15 +64,16 @@ const {
 
 // const client = new Client("wss://s1.ripple.com/");
 const client = new Client(
-  "wss://xrp-mainnet.g.allthatnode.com/full/json_rpc/e5dd0ee1279b440aa7a4661b8bf3f829"
+  "wss://XRP-mainnet.g.allthatnode.com/full/json_rpc/e5dd0ee1279b440aa7a4661b8bf3f829"
 );
 const tokenAdd = ref("");
 
-const limit = ref(10000);
+const limit = ref(1000);
 const currency = ref("");
 const ledgerMin = ref(-1);
 const ledgerMax = ref(-1);
-const poolList = ref("xrp");
+const poolList = ref("XRP");
+const selectedPool = ref("");
 const selectedTransactions = ref<any[]>([]);
 let chart: echarts.ECharts;
 let originalColoredData: any[] = [];
@@ -217,7 +81,6 @@ let globalColoredData: any[] = [];
 
 function calculatePoolId(tokenAdd: { value: string }, offer: any): string {
   // takerget가 객체 형태인 경우 처리'
-  console.log("offer", offer);
   if (
     typeof offer.takerget !== "string" &&
     offer.takerget.issuer !== tokenAdd.value
@@ -237,8 +100,8 @@ function calculatePoolId(tokenAdd: { value: string }, offer: any): string {
     }
   }
 
-  // 두 필드 모두 문자열인 경우 poolId를 "xrp"로 설정
-  return "xrp";
+  // 두 필드 모두 문자열인 경우 poolId를 "XRP"로 설정
+  return "XRP";
 }
 
 function isNotExistingOfferCreate(offerSequence: any) {
@@ -259,8 +122,10 @@ function getPoolId(offerSequence: any) {
 
 // state의 key들을 computed로 만듭니다.
 const stateKeys = computed(() => {
-  const tokenState = getOrCreateTokenMap(currency.value);
-  return Object.keys(tokenState);
+  const tokenState = getOrCreateTokenMap(tokenAdd.value);
+  const originalKeys = Object.keys(tokenState);
+  const processedKeys = originalKeys.map((key) => processTokenAddress(key));
+  return { originalKeys, processedKeys };
 });
 
 function decode(add: string) {
@@ -273,20 +138,25 @@ function decode(add: string) {
   return str;
 }
 
-function processTokenAddress(input: string): TokenInfo | string {
-  if (input.length >= 35) {
-    const parts = input.split(".");
-    if (parts.length >= 2) {
-      return {
-        currency: parts[0],
-        issuer: parts[1],
-      };
-    } else {
-      return input;
-    }
-  } else {
+function processTokenAddress(input: string): string {
+  const index = input.indexOf("_");
+  if (index === -1) {
+    // "_"가 없으면 그대로 반환
     return input;
   }
+
+  // "_" 앞부분 추출
+  const firstPart = input.substring(0, index);
+
+  // 정규식으로 16진수 문자열 여부 확인 (대소문자 모두 허용)
+  const hexRegex = /^[0-9a-fA-F]+$/;
+  if (hexRegex.test(firstPart)) {
+    // 16진수 문자열이면 decode 후 리턴
+    return decode(firstPart);
+  }
+
+  // 16진수 문자열이 아니더라도 잘라낸 문자열 리턴
+  return firstPart;
 }
 
 function formatDate(date: number): string {
@@ -429,17 +299,18 @@ function parseTx(tx: any) {
 }
 
 async function fetchAndProcessTx() {
+  const startTime = performance.now();
   if (!tokenAdd.value) {
     alert("토큰 주소를 입력하세요: ");
     return;
   }
-  const address = await processTokenAddress(tokenAdd.value);
-  console.dir(address);
+  // const address = await processTokenAddress(tokenAdd.value);
+  // console.dir(address);
   chart.showLoading({
     text: "데이터 로딩중...",
     textColor: "#FAF9F6",
     color: "#FAF9F6",
-    maskColor: "rgba(0, 0, 0, 0)",
+    maskColor: "rgba(0, 0, 0, 0.5)",
     zlevel: 0,
   });
 
@@ -465,15 +336,14 @@ async function fetchAndProcessTx() {
           account,
           ledger_index_max: ledgerMax.value,
           ledger_index_min: ledgerMin.value,
-          limit: 200,
+          limit: limit.value,
           ...(marker ? { marker } : {}),
         };
 
         const response = await client.request(request);
         const txs = response.result.transactions;
         allTxs = allTxs.concat(txs);
-        console.log("전체 allTxs 개수:", allTxs.length);
-        marker = response.result.marker;
+        marker = response.result.marker as string | undefined;
       } while (marker);
     } else {
       const request: AccountTxRequest = {
@@ -504,14 +374,17 @@ async function fetchAndProcessTx() {
       console.log("currency.value", currency.value);
       await formatData(allTxs);
     } else {
+      console.log("???????????????????????");
       await formataData_multy(allTxs);
     }
-    updateChart();
+    updateChart("XRP");
     await client.disconnect();
   } catch (e) {
     console.log(e);
     alert("트랜잭션 조회 중 오류 발생");
   } finally {
+    const endTime = performance.now();
+    console.log(`실행 시간: ${(endTime - startTime) / 1000}초`);
     chart.hideLoading();
   }
 }
@@ -545,7 +418,7 @@ function makedataset(tx: any, isXRP: boolean, isBuy: boolean) {
           1000000;
         const deliveredAmount = Math.abs(tx.meta.delivered_amount.value);
         const effectiveRate = sendAmount / deliveredAmount;
-        const poolId = "xrp";
+        const poolId = "XRP";
         const beforePrice =
           getBeforePrice(tokenAdd.value, poolId) == 0
             ? effectiveRate
@@ -596,7 +469,7 @@ function makedataset(tx: any, isXRP: boolean, isBuy: boolean) {
           modified.FinalFields.Balance.value;
         const deliveredAmount = tx.meta.delivered_amount / 1000000;
         const effectiveRate = deliveredAmount / Math.abs(sendAmount);
-        const poolId = "xrp";
+        const poolId = "XRP";
         const beforePrice =
           getBeforePrice(tokenAdd.value, poolId) == 0
             ? effectiveRate
@@ -646,7 +519,8 @@ function makedataset(tx: any, isXRP: boolean, isBuy: boolean) {
           modified.FinalFields.Balance.value;
         const deliveredAmount = tx.meta.delivered_amount.value;
         const effectiveRate = deliveredAmount / Math.abs(sendAmount);
-        const poolId = `${tx.meta.delivered_amount.currency}_${tx.meta.delivered_amount.issuer}`;
+        const poolId = `${tx.tx_json.SendMax.currency}_${tx.tx_json.SendMax.issuer}`;
+
         const beforePrice =
           getBeforePrice(tokenAdd.value, poolId) == 0
             ? effectiveRate
@@ -665,6 +539,7 @@ function makedataset(tx: any, isXRP: boolean, isBuy: boolean) {
           offerSequence: sequences,
           offerAmount: amounts,
         };
+        console.log("tokenAdd.value_sell", tokenAdd.value, poolId, tx);
         addPoolData(
           tokenAdd.value,
           poolId,
@@ -700,7 +575,7 @@ function makedataset(tx: any, isXRP: boolean, isBuy: boolean) {
           modified.FinalFields.Balance.value;
         const deliveredAmount = tx.meta.delivered_amount.value;
         const effectiveRate = Math.abs(sendAmount) / deliveredAmount;
-        const poolId = `${tx.tx_json.SendMax.currency}_${tx.tx_json.SendMax.issuer}`;
+        const poolId = `${tx.meta.delivered_amount.currency}_${tx.meta.delivered_amount.issuer}`;
         const beforePrice =
           getBeforePrice(tokenAdd.value, poolId) == 0
             ? effectiveRate
@@ -717,6 +592,7 @@ function makedataset(tx: any, isXRP: boolean, isBuy: boolean) {
           offerSequence: sequences,
           offerAmount: amounts,
         };
+        console.log("tokenAdd.value_buy", tokenAdd.value, poolId, tx);
         addPoolData(
           tokenAdd.value,
           poolId,
@@ -744,7 +620,6 @@ async function formataData_multy(txs: any[]) {
           //xrp를 보내고 토큰을 받음 (buy)
           if (typeof tx_json?.SendMax === "string") {
             if (meta.delivered_amount.issuer === tokenAdd.value) {
-
               // const tokenMap = getOrCreateTokenMap(
               //   meta.delivered_amount.currency
               // );
@@ -777,10 +652,10 @@ async function formataData_multy(txs: any[]) {
               );
             }
           } else if (tx_json?.SendMax?.issuer === tokenAdd.value) {
-            //받은 토큰이 xrp
+            //받은 토큰이 XRP
             if (typeof meta.delivered_amount === "string") {
               makedataset(tx, true, false);
-              // console.log("토큰 판매 후 xrp 받음");
+              // console.log("토큰 판매 후 XRP 받음");
             } else {
               makedataset(tx, false, true);
               // console.log("이 토큰으로 다른 토큰 구매:  ");
@@ -793,10 +668,9 @@ async function formataData_multy(txs: any[]) {
         } else {
           const categoryData = formatDate(tx.tx_json.date);
           const delivered =
-            typeof tx.meta.delivered_amount === "object" && tx.meta.delivered_amount !== null
-              ? parseFloat(tx.meta.delivered_amount.value)
-              : parseFloat(tx.meta.delivered_amount);
-
+            typeof tx.meta.delivered_amount === "string"
+              ? tx.meta.delivered_amount / 1000000
+              : tx.meta.delivered_amount.value;
           const info: send = {
             keyType: "send",
             account: tx.tx_json.Account,
@@ -848,7 +722,6 @@ async function formatData(txs: any[]) {
           //xrp를 보내고 토큰을 받음 (buy)
           if (typeof tx_json?.SendMax === "string") {
             if (meta.delivered_amount.issuer === tokenAdd.value) {
-
               // const tokenMap = getOrCreateTokenMap(
               //   meta.delivered_amount.currency
               // );
@@ -880,10 +753,10 @@ async function formatData(txs: any[]) {
               );
             }
           } else if (tx_json?.SendMax?.issuer === tokenAdd.value) {
-            //받은 토큰이 xrp
+            //받은 토큰이 XRP
             if (typeof meta.delivered_amount === "string") {
               makedataset(tx, true, false);
-              // console.log("토큰 판매 후 xrp 받음");
+              // console.log("토큰 판매 후 XRP 받음");
             } else {
               makedataset(tx, false, true);
               // console.log("이 토큰으로 다른 토큰 구매:  ");
@@ -931,20 +804,22 @@ async function formatData(txs: any[]) {
 
         //price는 beforePrice에 있음
         //모든 pool 배열에 저장
-      } else if (type == "OfferCancel") {
-        if (isNotExistingOfferCreate(tx.tx_json?.OfferSequence)) {
-          continue;
-        }
-        const categoryData = formatDate(tx.tx_json.date);
-        const info = parseTx(tx);
-        const poolId = getPoolId(info.offerSequence);
-        addOfferDatas(tokenAdd.value, poolId, tx, categoryData, info);
-      } else if (type == "OfferCreate") {
-        const categoryData = formatDate(tx.tx_json.date);
-        const info = parseTx(tx);
-        const poolId = calculatePoolId(tokenAdd, info);
-        addOfferDatas(tokenAdd.value, poolId, tx, categoryData, info);
       }
+      // else if (type == "OfferCreate") {
+      //   const categoryData = formatDate(tx.tx_json.date);
+      //   const info = parseTx(tx);
+      //   const poolId = calculatePoolId(tokenAdd, info);
+      //   addOfferDatas(tokenAdd.value, poolId, tx, categoryData, info);
+      // }
+      // else if (type == "OfferCancel") {
+      //   if (isNotExistingOfferCreate(tx.tx_json?.OfferSequence)) {
+      //     continue;
+      //   }
+      //   const categoryData = formatDate(tx.tx_json.date);
+      //   const info = parseTx(tx);
+      //   const poolId = getPoolId(info.offerSequence);
+      //   addOfferDatas(tokenAdd.value, poolId, tx, categoryData, info);
+      // }
     } catch (e) {
       console.log("error", e, tx);
     }
@@ -1046,13 +921,13 @@ onMounted(() => {
     // },
     grid: [
       {
-        left: "15%",
+        left: "8%",
         right: "5%",
-        height: "60%", // 메인 차트 영역을 60%로 늘림
-        backgroundColor: "#000000",
+        height: "70%", // 메인 차트 영역을 60%로 늘림
+        backgroundColor: "#111111",
       },
       {
-        left: "12%",
+        left: "8%",
         right: "5%",
         top: "20%", // 보조 차트 영역의 위치도 약간 조정
         height: "50%", // 보조 영역을 20%로 늘림
@@ -1284,7 +1159,7 @@ onMounted(() => {
         splitArea: {
           show: true,
           areaStyle: {
-            color: "#111111",
+            color: ["#111111", "#111111"],
           },
         },
       },
@@ -1441,7 +1316,9 @@ onMounted(() => {
 
       globalColoredData = originalColoredData.map((dataPoint) => {
         const sameAccount = dataPoint.account == clickedAccount;
-        const offerseq = Array.isArray(dataPoint.info?.offerSequence) ? dataPoint.info?.offerSequence : [dataPoint.info?.offerSequence];
+        const offerseq = Array.isArray(dataPoint.info?.offerSequence)
+          ? dataPoint.info?.offerSequence
+          : [dataPoint.info?.offerSequence];
         const sameSequence = offerseq.some((seq: number) =>
           clickedSequence.includes(seq)
         );
@@ -1497,7 +1374,6 @@ onMounted(() => {
       ],
     });
   });
-
   myChart.dispatchAction({
     type: "brush",
     areas: [
@@ -1510,9 +1386,8 @@ onMounted(() => {
   });
 });
 
-function updateChart() {
+function updateChart(selected: string) {
   if (!chart) return;
-
   const index = stateKeys.value.processedKeys.indexOf(selected);
   if (index === -1) {
     console.error("선택된 키에 해당하는 원본 키를 찾을 수 없습니다.");
@@ -1665,73 +1540,141 @@ window.addEventListener("resize", () => {
 });
 </script>
 
-<style>
-.main-container {
-  display: flex;
-  align-items: center;
-  margin-right: 20px;
-}
+<style scoped>
+.header {
+  background: linear-gradient(90deg, #11111100, #0c5a8522);
+  border-radius: 15px;
+  padding: 0px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
 
-.logo {
-  font-size: 40px;
-  color: #cecece;
-  text-align: center;
+  background-color: transparent;
 }
 
 .logo-contaier {
   display: flex;
+  justify-content: space-between;
   align-items: center;
-  margin-left: 40px;
 }
 
-.no-border-select .v-field__outline,
-.no-border-select .v-field__details {
-  display: none;
-}
-
-/* .no-border-select .v-field__prepend-inner {
-  margin-right: 0;
-} */
-
-.center-text-select .v-field__input {
-  text-align: center;
+.logo {
+  font-size: 44px;
+  font-weight: bold;
+  background: linear-gradient(
+    to right,
+    #2ece61c8,
+    #115d0449
+  ); /* 그라데이션 색상 */
+  -webkit-background-clip: text; /* 배경을 텍스트에 맞게 자르기 */
+  color: transparent;
 }
 
 .search-Container {
   display: flex;
   align-items: center;
+  background: rgba(255, 255, 255, 0);
+  border-radius: 30px;
+  padding: 2px 20px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0);
+}
+
+.search-input {
+  padding: 10px;
+  margin-right: 10px;
+  border-radius: 20px;
+  border: 1px solid #00000070;
+  background-color: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  font-size: 14px;
+}
+
+.searchbtn {
+  padding: 12px 20px;
+  border-radius: 30px;
+  background: linear-gradient(135deg, #02871489, #00000057);
+  color: rgb(0, 0, 0);
+  border: 1px solid #00000070;
+  font-weight: bold;
+  box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.5);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+}
+
+.searchbtn:hover {
+  transform: scale(1.05);
+  box-shadow: 0px 8px 15px rgba(0, 0, 0, 0.3);
+}
+
+.searchbtn:active {
+  transform: scale(1.2);
+  box-shadow: 0px 8px 15px rgba(0, 0, 0, 0.7);
+}
+
+.searchbtn:focus {
+  outline: none;
+}
+.tokenlist-container {
   margin-top: 10px;
+  background: linear-gradient(
+    135deg,
+    #07092f00,
+    #080d3c00,
+    #01084100,
+    #9a7eff00
+  );
+  border-radius: 10px;
+  padding: 0px;
+  box-shadow: 0px 4px 15px rgba(67, 67, 67, 0.225);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
 }
 
 .tokenlist {
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  color: #811313;
+  font-size: 20px;
+  gap: 5px;
 }
 
-.search-input {
-  margin-left: 20px;
-  background-color: #333338;
-  border-radius: 5px;
-  width: fit-content;
-  height: 40px;
-  width: 300px;
-}
-
-.searchbtn {
-  margin-left: 10px;
-  color: #cecece !important;
-  background: transparent;
-}
-
-.tokenaddress {
-  color: #cecece;
-}
-
-.from {
-  color: #cecece;
-}
-
+.from,
 .to {
-  color: #cecece;
+  padding: 10px 20px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+  font-weight: bold;
+}
+
+.from,
+.to {
+  padding: 5px 10px;
+  background: linear-gradient(
+    to right,
+    rgba(129, 129, 129, 0),
+    rgba(61, 61, 61, 0.164)
+  );
+
+  border-radius: 10px;
+}
+
+.main-container {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 30px;
+  border-radius: 15px;
+  background: linear-gradient(90deg, #13829e00, #0c5b8500);
+  padding: 20px;
+  box-shadow: 0px 4px 5px rgba(0, 0, 0, 0.5);
+}
+
+.chart {
+  border-radius: 10px;
+  background: linear-gradient(135deg, #00000000, #4a5a8f00);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+
+  overflow: hidden;
+  clip-path: polygon(0 0, 75% 0, 100% 10%, 100% 100%, 0 100%);
 }
 </style>
