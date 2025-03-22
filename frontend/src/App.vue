@@ -25,13 +25,13 @@ const {
   addPoolData,
   addtoAllPoolDatas,
   getPoolData,
-  getOfferData,
   addOfferDatas,
+  getOfferData
 } = usePoolPriceState();
 
 const client = new Client("wss://s1.ripple.com/");
 const tokenAdd = ref("");
-const limit = ref(10000);
+const limit = ref(300);
 const ledgerMin = ref(-1);
 const ledgerMax = ref(-1);
 const poolList = ref("xrp");
@@ -50,60 +50,6 @@ function formatDate(date: number): string {
   const minutes = String(d.getMinutes()).padStart(2, "0");
   const seconds = String(d.getSeconds()).padStart(2, "0");
   return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
-}
-
-function isOfferProcessingPayment(tx: any): boolean {
-  // Payment 트랜잭션이 아니면 false 반환
-  if (tx.tx_json.TransactionType !== "Payment") return false;
-  
-  // meta나 AffectedNodes가 없으면 false 반환
-  if (!tx.meta || !tx.meta.AffectedNodes) return false;
-  
-  // AffectedNodes 배열 내에서 Offer 관련 노드가 하나라도 있는지 확인
-  return tx.meta.AffectedNodes.some((node: any) => {
-    if (node.CreatedNode && node.CreatedNode.LedgerEntryType === "Offer") return true;
-    if (node.ModifiedNode && node.ModifiedNode.LedgerEntryType === "Offer") return true;
-    if (node.DeletedNode && node.DeletedNode.LedgerEntryType === "Offer") return true;
-    return false;
-  });
-}
-
-function getOfferSequenceAndAmounts(tx: any): { sequences: number[]; amounts: number[] } {
-  const sequences: number[] = [];
-  const amounts: number[] = [];
-
-  if (!tx.meta || !tx.meta.AffectedNodes) return { sequences, amounts };
-
-  tx.meta.AffectedNodes.forEach((node: any) => {
-    // Offer 노드가 있는지 확인 (CreatedNode, ModifiedNode, DeletedNode 중 하나)
-    let offerNode = null;
-    if (node.CreatedNode && node.CreatedNode.LedgerEntryType === "Offer") {
-      offerNode = node.CreatedNode;
-    } else if (node.ModifiedNode && node.ModifiedNode.LedgerEntryType === "Offer") {
-      offerNode = node.ModifiedNode;
-    } else if (node.DeletedNode && node.DeletedNode.LedgerEntryType === "Offer") {
-      offerNode = node.DeletedNode;
-    }
-    if (offerNode) {
-      // Offer 노드에서 Sequence 값 추출 (NewFields 또는 FinalFields)
-      const seq = offerNode.NewFields?.Sequence ?? offerNode.FinalFields?.Sequence;
-      if (seq !== undefined) {
-        sequences.push(seq);
-      }
-      // Offer 노드에서 TakerPays 금액 추출 (NewFields 또는 FinalFields)
-      const takerPays = offerNode.NewFields?.TakerPays ?? offerNode.FinalFields?.TakerPays;
-      if (takerPays !== undefined) {
-        let amount: number = 0;
-        if (typeof takerPays === "string") {
-          amount = parseFloat(takerPays);
-        } else if (typeof takerPays === "object" && takerPays.value !== undefined) {
-          amount = parseFloat(takerPays.value);
-        }
-        amounts.push(amount);
-      }
-    }
-  });
-  return { sequences, amounts };
 }
 
 async function fetchAndProcessTx() {
@@ -135,12 +81,7 @@ async function fetchAndProcessTx() {
     const txs = response.result.transactions;
     await formatData(txs);
 
-    
-    
-    
 
-   
-  
     // const values = getValues(poolList.value);
     // const dates = getValues("xrp");
 
@@ -191,7 +132,6 @@ function computeCandleColors(
 }
 
 function makedataset(tx: any, isXRP: boolean, isBuy: boolean) {
-  const {sequences, amounts} = getOfferSequenceAndAmounts(tx)
   try {
     const categoryData = formatDate(tx.tx_json.date);
     if (isXRP) {
@@ -204,9 +144,7 @@ function makedataset(tx: any, isXRP: boolean, isBuy: boolean) {
               node.ModifiedNode.FinalFields &&
               node.ModifiedNode.FinalFields.Account === tx.tx_json.Account
             );
-            
           }
-
         });
 
         if (!nodeWrapper) {
@@ -227,17 +165,12 @@ function makedataset(tx: any, isXRP: boolean, isBuy: boolean) {
         const value = [beforePrice, effectiveRate, beforePrice, effectiveRate];
         const type = tx.tx_json.TransactionType;
         setBeforePrice(poolId, effectiveRate);
-
-        
         const info: payment = {
           keyType: "buy",
           account: tx.tx_json.Account,
           fee: tx.tx_json.Fee / 1000000,
           sendAmount: sendAmount,
           deliveredAmount: deliveredAmount,
-          offerSequence: sequences,
-          offerAmount: amounts,
-
         };
         addPoolData(poolId, [categoryData, value, type, tx], info);
       } else {
@@ -272,15 +205,12 @@ function makedataset(tx: any, isXRP: boolean, isBuy: boolean) {
         const value = [beforePrice, effectiveRate, effectiveRate, beforePrice];
         const type = tx.tx_json.TransactionType;
         setBeforePrice(poolId, effectiveRate);
-
         const info: payment = {
           keyType: "sell",
           account: tx.tx_json.Account,
           fee: tx.tx_json.Fee / 1000000,
           sendAmount: sendAmount,
           deliveredAmount: deliveredAmount,
-          offerSequence: sequences,
-          offerAmount: amounts,
         };
         addPoolData(poolId, [categoryData, value, type, tx], info);
       }
@@ -314,15 +244,12 @@ function makedataset(tx: any, isXRP: boolean, isBuy: boolean) {
         const value = [beforePrice, effectiveRate, effectiveRate, beforePrice];
         const type = tx.tx_json.TransactionType;
         setBeforePrice(poolId, effectiveRate);
-
         const info: payment = {
           keyType: "sell",
           account: tx.tx_json.Account,
           fee: tx.tx_json.Fee / 1000000,
           sendAmount: sendAmount,
           deliveredAmount: deliveredAmount,
-          offerSequence: sequences,
-          offerAmount: amounts,
         };
         addPoolData(poolId, [categoryData, value, type, tx], info);
       } else {
@@ -366,9 +293,6 @@ function makedataset(tx: any, isXRP: boolean, isBuy: boolean) {
           fee: tx.tx_json.Fee / 1000000,
           sendAmount: sendAmount,
           deliveredAmount: deliveredAmount,
-          offerSequence: sequences,
-          offerAmount: amounts,
-          
         };
         addPoolData(poolId, [categoryData, value, type, tx], info);
       }
@@ -392,7 +316,6 @@ async function formatData(txs: any[]) {
           if (typeof tx_json?.SendMax === "string") {
             if (meta.delivered_amount.issuer === tokenAdd.value) {
               makedataset(tx, true, true);
-  
               // console.log("xrp로 구매");
               //받는 토큰이 tokenAddress임 -> currency도 나중에 처리하게 수정해야함
             } else {
@@ -442,14 +365,11 @@ async function formatData(txs: any[]) {
           };
           addtoAllPoolDatas([categoryData, type, tx], info);
         }
-      } else if (type == "TrustSet") {
+      } else if (type === "TrustSet") {
         //price는 beforePrice에 있음
         //모든 pool 배열에 저장
-      } else if (type == "OfferCancel" || type == "OfferCreate") {
-        tokenAdd.value
-        const date = tx.tx_json.date
-        const issuer = tx.tx_json.
-
+      } else if (type === "OfferCancel" || type === "OfferCreate") {
+        //모든 pool 배열에 저장
       }
     } catch (e) {
       console.log("error", e, tx);
@@ -927,43 +847,78 @@ onMounted(() => {
   myChart.setOption(option);
 
   chart.on("click", (params: any) => {
-    if (params.seriesType === "candlestick") {
-      const clickedAccount = params.data.account;
-      console.log("클릭된 account:", clickedAccount);
-      if (
-        selectedTransactions.value.length &&
-        selectedTransactions.value[0].account === clickedAccount
-      ) {
-        selectedTransactions.value = [];
-        globalColoredData = originalColoredData.map((data) => ({ ...data }));
-      } else {
-        selectedTransactions.value = globalColoredData.filter(
-          (dataPoint) => dataPoint.account === clickedAccount
-        );
-        globalColoredData = originalColoredData.map((dataPoint) => {
-          if (dataPoint.account === clickedAccount) {
-            // selectedTransactions.value.push(dataPoint.data);
-            return {
-              ...dataPoint,
-              itemStyle: {
-                color: "#FFA500", // 주황색
-                borderWidth: 0,
-              },
-            };
-          }
-          return dataPoint;
-        });
-      }
-      console.dir(selectedTransactions.value);
-      chart.setOption({
-        series: [
-          {
-            data: globalColoredData,
+  if (params.seriesType !== "candlestick") return;
+
+  const clicked = params.data;
+  const clickedAccount = clicked.account;
+  const clickedSequence = clicked.info?.offerSequence;
+
+  const isSameAccount =
+    selectedTransactions.value.length &&
+    selectedTransactions.value[0].account === clickedAccount;
+
+  if (isSameAccount) {
+    // 다시 클릭하면 초기화
+    selectedTransactions.value = [];
+    globalColoredData = originalColoredData.map((d) => ({ ...d }));
+  } else {
+    selectedTransactions.value = [clicked];
+
+    globalColoredData = originalColoredData.map((dataPoint) => {
+      const sameAccount = dataPoint.account === clickedAccount;
+      const sameSequence = dataPoint.info?.offerSequence === clickedSequence;  
+
+      if (sameAccount && dataPoint.tx === clicked.tx) {
+        // 🔴 클릭된 캔들
+        return {
+          ...dataPoint,
+          itemStyle: {
+            color: "#FF0000", // 빨간색
+            borderWidth: 2,
           },
-        ],
-      });
-    }
+        };
+      } else if (sameAccount && sameSequence) {
+        // 같은 account, sequence
+        return {
+          ...dataPoint,
+          itemStyle: {
+            color: "#80800", // 올리브색
+            borderWidth: 0,
+          },
+        };
+      }else if (sameAccount) {
+        // 🟠 같은 account
+        return {
+          ...dataPoint,
+          itemStyle: {
+            color: "#FFA500", // 주황색
+            borderWidth: 0,
+          },
+        };
+      } else if (sameSequence) {
+        // 🟢 같은 sequence
+        return {
+          ...dataPoint,
+          itemStyle: {
+            color: "#00B992", // 민트색
+            borderWidth: 0,
+          },
+        };
+      } else {
+        // 기본 색상 유지
+        return { ...dataPoint };
+      }
+    });
+  }
+
+  chart.setOption({
+    series: [
+      {
+        data: globalColoredData,
+      },
+    ],
   });
+});
 
   myChart.dispatchAction({
     type: "brush",
@@ -977,7 +932,7 @@ onMounted(() => {
   });
 });
 
-function updateChart() {
+function updateChart() { 
   if (!chart) return;
   const txdata = getPoolData(poolList.value);
 
@@ -991,17 +946,22 @@ function updateChart() {
         color0: "#3F46FF",
         borderWidth: 0,
       };
-    } else if (
-      candleType === "route" ||
-      candleType === "trustLine" ||
-      candleType === "offer"
-    ) {
+    } else if (candleType === "offerCreate" || candleType === "offerCancel") {
       itemStyle = {
+        color: "#00B992",
+        color0: "#00B992",
+        borderWidth: 0,
+      };
+    } else if(
+      candleType === "route" ||
+      candleType === "trustLine"){
+        itemStyle = {
         color: "#000000",
         color0: "#000000",
         borderWidth: 0,
       };
-    } else {
+    }
+    else {
       if (candle[0] <= candle[1]) {
         // 상승
         itemStyle = { color: "#88D693", borderWidth: 0 };
