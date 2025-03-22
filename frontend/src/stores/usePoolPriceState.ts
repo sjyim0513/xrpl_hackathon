@@ -4,6 +4,7 @@ import type {
   OfferState,
 } from "../interfaces/transaction_interface";
 
+const state = reactive<Record<string, PoolState>>({});
 
 const ReactiveOfferState = reactive<Record<string, OfferState>>({});
 
@@ -62,7 +63,7 @@ export function usePoolPriceState() {
     poolState.type.push(data[2]);
     poolState.tx.push(data[3]);
     poolState.info.push(info);
-    console.log("poolState", poolState, token, poolId);
+    console.log();
   }
 
   function addtoAllPoolDatas(data: [string, string, any], info: any) {
@@ -93,8 +94,7 @@ export function usePoolPriceState() {
     date: string,
     info: any
   ) {
-    const offerId = info.offerSequence;
-    console.log(offerId)
+    const offerId = info.keyType + info.offerSequence;
 
     if (info.keyType == "offerCreate") {
       ReactiveOfferState[offerId].takerpay.push(info.takerpay);

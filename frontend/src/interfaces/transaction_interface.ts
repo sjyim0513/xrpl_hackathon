@@ -156,10 +156,9 @@ export interface offerCancel {
 }
 
 export interface OfferState {
-
-  takerpay : any[]
-  takerget : any[]
-  acount : string[]
+  takerpay: any[];
+  takerget: any[];
+  acount: string[];
 }
 
 export interface txInfo {}
