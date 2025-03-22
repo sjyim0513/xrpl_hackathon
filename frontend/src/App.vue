@@ -18,6 +18,7 @@ import { Client } from "xrpl";
 import { usePoolPriceState } from "./stores/usePoolPriceState";
 import type { payment, route, send } from "./interfaces/transaction_interface";
 import TransactionCard from "./components/TransactionCard.vue";
+import { error } from "echarts/types/src/util/log.js";
 
 const {
   getBeforePrice,
@@ -39,6 +40,42 @@ const selectedTransactions = ref<any[]>([]);
 let chart: echarts.ECharts;
 let originalColoredData: any[] = [];
 let globalColoredData: any[] = [];
+
+function calculatePoolId(tokenAdd: { value: string }, offer: any): string {
+  // takerget가 객체 형태인 경우 처리
+  if (typeof offer.takerget !== "string" && offer.takerget.issuer !== tokenAdd.value) {
+    if (offer.takerget.issuer !== tokenAdd.value) {
+      return offer.takerget.issuer + offer.takerget.currency;
+    }
+  }
+  
+  // takerpay가 객체 형태인 경우 처리
+  if (typeof offer.takerpay !== "string" && offer.takerget.issuer !== tokenAdd.value) {
+    if (offer.takerpay.issuer !== tokenAdd.value) {
+      return offer.takerpay.issuer + offer.takerpay.currency;
+    }
+  }
+  
+  // 두 필드 모두 문자열인 경우 poolId를 "xrp"로 설정
+  return "xrp";
+}
+
+function isNotExistingOfferCreate (offerSequence: any) {
+  const offerId = "OfferCreate" + offerSequence
+  try {
+    getOfferData(offerId)
+    return false
+  } catch (error) {
+    return true
+  }
+}
+
+function getPoolId(offerSequence: any) {
+  const offerId = "OfferCreate" + offerSequence
+  const originalOffer = getOfferData(offerId)
+  return calculatePoolId(tokenAdd, originalOffer)
+}
+
 
 function formatDate(date: number): string {
   const utc_sec = date + 946684800;
@@ -105,6 +142,64 @@ function getOfferSequenceAndAmounts(tx: any): { sequences: number[]; amounts: nu
   });
   return { sequences, amounts };
 }
+
+function parseTx(tx: any){
+  const txJson = tx.tx_json;
+  
+  // 공통 필드 처리 (수수료는 XRPL 단위로 10^6 나누기)
+  const fee = Number(txJson.fee) / 1000000;
+  const account = txJson.account;
+  const offerSequence = Number(txJson.sequence);
+
+  // TransactionType에 따른 분기 처리
+  if (txJson.TransactionType === "OfferCreate") {
+    // TakerGets 처리: 문자열이면 XRPL 단위, 객체이면 currency, issuer, value 필드 변환
+    let takerget: string | { currency: string; issuer: string; value: string };
+    if (typeof txJson.TakerGets === "string") {
+      takerget = (Number(txJson.TakerGets) / 1000000).toString();
+    } else {
+      takerget = {
+        currency: txJson.TakerGets.currency,
+        issuer: txJson.TakerGets.issuer,
+        value: (Number(txJson.TakerGets.value) / 1000000).toString(),
+      };
+    }
+
+    // TakerPays 처리: 문자열이면 XRPL 단위, 객체이면 currency, issuer, value 필드 변환
+    let takerpay: string | { currency: string; issuer: string; value: string };
+    if (typeof txJson.TakerPays === "string") {
+      takerpay = (Number(txJson.TakerPays) / 1000000).toString();
+    } else {
+      takerpay = {
+        currency: txJson.TakerPays.currency,
+        issuer: txJson.TakerPays.issuer,
+        value: (Number(txJson.TakerPays.value) / 1000000).toString(),
+      };
+    }
+
+    return {
+      keyType: "OfferCreate",
+      offerSequence,
+      account,
+      fee,
+      takerpay,
+      takerget,
+    } 
+  } else if (txJson.TransactionType === "OfferCancel") {
+    // OfferCancel의 경우 추가 데이터(tx_json.date, tx_json.OfferSequence 등)는 별도 처리가 가능하나,
+    // 인터페이스에 정의된 keyType, offerSequence, account, fee만 info 객체에 포함합니다.
+    return {
+      keyType: "OfferCancel",
+      offerSequence,
+      account,
+      fee,
+    } 
+  } else {
+    throw new Error("지원하지 않는 트랜잭션 타입입니다.");
+  }
+}
+
+
 
 async function fetchAndProcessTx() {
   if (!tokenAdd.value) {
@@ -380,7 +475,7 @@ function makedataset(tx: any, isXRP: boolean, isBuy: boolean) {
 
 async function formatData(txs: any[]) {
   const reversedTxs = [...txs].reverse();
-  reversedTxs.forEach((tx) => {
+  for (const tx of reversedTxs) {
     try {
       const type = tx.tx_json?.TransactionType;
       if (type === "Payment") {
@@ -445,17 +540,31 @@ async function formatData(txs: any[]) {
       } else if (type == "TrustSet") {
         //price는 beforePrice에 있음
         //모든 pool 배열에 저장
-      } else if (type == "OfferCancel" || type == "OfferCreate") {
-        tokenAdd.value
-        const date = tx.tx_json.date
-        const issuer = tx.tx_json.
+      } else if (type == "OfferCancel") {
+
+        if (isNotExistingOfferCreate(tx.tx_json?.OfferSequence)) {
+          continue
+        }
+        
+        const info = parseTx(tx) 
+        const poolId = getPoolId(info.offerSequence)
+        addOfferDatas(poolId, tx, tx.tx_json.date, info)
+
+
+      } else if (type == "OfferCreate") { 
+        const info = parseTx(tx) 
+        const poolId = calculatePoolId(tokenAdd, info)
+        addOfferDatas(poolId, tx, tx.tx_json.date, info)
 
       }
     } catch (e) {
       console.log("error", e, tx);
     }
-  });
-}
+  };
+  }
+ 
+    
+
 
 const chartDom = ref<HTMLDivElement | null>(null);
 

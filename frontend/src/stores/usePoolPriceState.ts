@@ -65,11 +65,8 @@ export function usePoolPriceState() {
 
 
 
-  function addOfferDatas(prePoolId: string, tx: any, date: string, info: any, ) {
-    if (typeof info.takerget !== "string" || typeof info.takerpay !== "string") {
-      
-    }
-    const poolId =  
+  function addOfferDatas(poolId: string, tx: any, date: string, info: any) {
+  
     const offerId = info.keyType + info.offerSequence
 
     if (info.keyType == "offerCreate") {
@@ -80,7 +77,7 @@ export function usePoolPriceState() {
     
     
 
-    const beforePrice = getBeforePrice(prePoolId)
+    const beforePrice = getBeforePrice(poolId)
     const value = [
     beforePrice,
     beforePrice + 0.00000000001,
