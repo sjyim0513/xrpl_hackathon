@@ -151,6 +151,7 @@ export interface offerCancel {
 }
 
 export interface OfferState {
+
   takerpay : any[]
   takerget : any[]
   acount : string[]
