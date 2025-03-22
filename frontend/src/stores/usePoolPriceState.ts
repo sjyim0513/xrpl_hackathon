@@ -2,7 +2,22 @@ import { reactive } from "vue";
 import type { PoolState,  OfferState} from "../interfaces/transaction_interface";
 
 const state = reactive<Record<string, PoolState>>({});
+
 const ReactiveOfferState = reactive<Record<string, OfferState>>({});
+
+const tokenMaps = reactive<Record<string, Record<string, PoolState>>>({});
+
+function createPoolState(): Record<string, PoolState> {
+  return reactive<Record<string, PoolState>>({});
+}
+
+export function getOrCreateTokenMap(key: string): Record<string, PoolState> {
+  if (!tokenMaps[key]) {
+    tokenMaps[key] = createPoolState();
+  }
+  return tokenMaps[key];
+}
+
 
 export function usePoolPriceState() {
   function initializePool(poolId: string) {
@@ -51,9 +66,9 @@ export function usePoolPriceState() {
       const beforePrice = getBeforePrice(poolId);
       const value = [
         beforePrice,
-        beforePrice + 0.00000000001,
+        beforePrice + 0.00000000002,
         beforePrice,
-        beforePrice + 0.00000000001,
+        beforePrice + 0.00000000002,
       ];
       state[poolId].categoryDate.push(data[0]);
       state[poolId].values.push(value);
@@ -102,6 +117,12 @@ export function usePoolPriceState() {
     return state[poolId];
   }
 
+  function getStateKeys(): string[] {
+    const keys = Object.keys(state);
+    console.log("State keys:", keys);
+    return keys;
+  }
+
   function getValues(poolId: string) {
     return state[poolId].values;
   }
@@ -134,8 +155,11 @@ export function usePoolPriceState() {
     getTypes,
     getTxs,
     getInfos,
+
     addOfferDatas,
     getOfferData
     
+
+    getOrCreateTokenMap,
   };
 }

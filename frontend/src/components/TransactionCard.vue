@@ -2,7 +2,7 @@
   <div class="card-container">
     <div class="address">
       <div class="account">Account</div>
-      {{ effectiveTransactions[0].account }}
+      <div class="addressitem">{{ effectiveTransactions[0].account }}</div>
     </div>
     <v-window class="card-window" v-model="onboarding" show-arrows="hover">
       <v-window-item
@@ -11,11 +11,14 @@
         :value="index"
       >
         <v-card class="card-info" elevation="2" theme="dark">
-          <div class="card22">{{ transaction.info.keyType }}</div>
+          <div class="card-plate" :class="transaction.info.keyType">
+            {{ transaction.info.keyType }}
+          </div>
+
+          <InfoComponent :info="omitAccount(transaction.info)" />
           <a :href="`${baseurl}${transaction.tx.hash}/simple`" target="_blank"
             >Link</a
           >
-          <div class="card22">{{ transaction.info.keyType }}</div>
         </v-card>
       </v-window-item>
     </v-window>
@@ -24,6 +27,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import InfoComponent from "./infoComponent.vue";
 
 const onboarding = ref(0);
 const baseurl = "https://livenet.xrpl.org/transactions/";
@@ -33,7 +37,7 @@ const props = defineProps<{
 
 const effectiveTransactions = computed(() => {
   if (props.transactions && props.transactions.length > 0) {
-    console.log("props", props.transactions[0].tx);
+    console.log("props", props.transactions);
     return props.transactions;
   } else {
     return [
@@ -47,34 +51,71 @@ const effectiveTransactions = computed(() => {
     ];
   }
 });
+
+function omitAccount(info: Record<string, any>): Record<string, any> {
+  const { account, ...rest } = info;
+  return rest;
+}
 </script>
 
 <style>
 .card-container {
-  /* height: 100%; */
+  margin-right: 10px;
 }
 
 .account {
   font-size: 19px;
   font-weight: 1000;
+  margin-bottom: 5px;
 }
 
 .address {
   margin: 10px;
-  height: 100px;
   border-radius: 10px;
-  background: #cecece;
+  background: #212121;
   padding: 10px;
+  color: #cecece;
 }
 
 .card-info {
   margin: 10px;
   min-width: 300px;
-  height: 500px;
 }
 
-.card22 {
-  background: #cecece;
+.card-plate {
   padding: 20px;
+  font-size: 25px;
+  font-weight: 500;
+  color: #cecece;
+}
+
+.addressitem {
+  background-color: #181818;
+  border-radius: 15px;
+  padding: 15px;
+}
+
+.buy {
+  background-color: #089981;
+}
+
+.sell {
+  background-color: #f23645;
+}
+
+.offer {
+  background-color: blue;
+}
+
+.send {
+  background-color: #3f46ff;
+}
+
+.route {
+  background-color: purple;
+}
+
+.trustLine {
+  background-color: #d482ff;
 }
 </style>
