@@ -9,6 +9,6 @@ function decode() {}
 <style>
 .list-container {
   border-radius: 15px;
-  background-color: aliceblue;
+  background-color: rgb(255, 240, 240);
 }
 </style>

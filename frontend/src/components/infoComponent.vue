@@ -30,6 +30,7 @@ const props = defineProps<{
 }
 
 .item-key-Container {
-  margin-right: 20px;
+  margin-right: 10px;
+  
 }
 </style>
