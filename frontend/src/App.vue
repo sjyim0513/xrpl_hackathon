@@ -94,7 +94,7 @@ async function fetchAndProcessTx() {
     alert("토큰 주소를 입력하세요: ");
     return;
   }
-  processTokenString(tokenAdd.value);
+  // processTokenString(tokenAdd.value);
   chart.showLoading({
     text: "데이터 로딩중...",
     textColor: "#FAF9F6",
@@ -911,18 +911,16 @@ function updateChart() {
         color0: "#3F46FF",
         borderWidth: 0,
       };
-    } else if (candleType === "route" ) {
+    } else if (candleType === "route") {
       //루트 색상
-    
     } else if (candleType === "trustLine") {
-    itemStyle = {
-      color: "#D482FF",  
-      color0: "#D482FF",
-      borderWidth: 0,
-    };
+      itemStyle = {
+        color: "#D482FF",
+        color0: "#D482FF",
+        borderWidth: 0,
+      };
     } else if (candleType === "offer") {
       //오퍼 색상
-      
     } else {
       if (candle[0] <= candle[1]) {
         // 상승
