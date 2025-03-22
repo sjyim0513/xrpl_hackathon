@@ -99,7 +99,7 @@ export interface PoolState {
   values: number[][];
   type: string[];
   tx: any[];
-  info: (payment | send | route | trustLine | offer)[];
+  info: (payment | send | route | trustLine | offerCreate | offerCancel)[];
 }
 
 //hash도 추가해서 캔들 클릭했을 때 링크 만들 수 있게
@@ -109,6 +109,8 @@ export interface payment {
   fee: number;
   sendAmount: number;
   deliveredAmount: number;
+  offerSequence: number[] | null;
+  offerAmount: number[] | null;
 }
 
 export interface send {
@@ -132,12 +134,26 @@ export interface trustLine {
   amount: string;
 }
 
-export interface offer {
+export interface offerCreate {
   keyType: string;
+  offerSequence: number;
   account: string;
   fee: number;
   takerpay: string | { currency: string; issuer: string; value: string };
   takerget: string | { currency: string; issuer: string; value: string };
+}
+
+export interface offerCancel {
+  keyType: string;
+  offerSequence: number;
+  account: string;
+  fee: number;
+}
+
+export interface OfferState {
+  takerpay : any[]
+  takerget : any[]
+  acount : string[]
 }
 
 export interface txInfo {}

@@ -1,7 +1,8 @@
 import { reactive } from "vue";
-import type { PoolState } from "../interfaces/transaction_interface";
+import type { PoolState,  OfferState} from "../interfaces/transaction_interface";
 
 const state = reactive<Record<string, PoolState>>({});
+const ReactiveOfferState = reactive<Record<string, OfferState>>({});
 
 export function usePoolPriceState() {
   function initializePool(poolId: string) {
@@ -62,6 +63,43 @@ export function usePoolPriceState() {
     });
   }
 
+
+
+  function addOfferDatas(prePoolId: string, tx: any, date: string, info: any, ) {
+    if (typeof info.takerget !== "string" || typeof info.takerpay !== "string") {
+      
+    }
+    const poolId =  //curr issuer
+    const offerId = info.keyType + info.offerSequence
+
+    if (info.keyType == "offerCreate") {
+      ReactiveOfferState[offerId].takerpay.push(info.takerpay)
+      ReactiveOfferState[offerId].takerget.push(info.takerget)
+      ReactiveOfferState[offerId].acount = info.acount
+    };
+    
+    
+
+    const beforePrice = getBeforePrice(prePoolId)
+    const value = [
+    beforePrice,
+    beforePrice + 0.00000000001,
+    beforePrice,
+    beforePrice + 0.00000000001,]
+    
+    
+    state[poolId].categoryDate.push(date);
+    state[poolId].values.push(value);
+    state[poolId].type.push(info.keyType);
+    state[poolId].tx.push(tx);
+    state[poolId].info.push(info);
+    }
+
+  function getOfferData(offerId: string) {
+    return ReactiveOfferState[offerId]
+  }
+  
+
   function getPoolData(poolId: string) {
     console.log("state", state);
     return state[poolId];
@@ -99,5 +137,8 @@ export function usePoolPriceState() {
     getTypes,
     getTxs,
     getInfos,
+    addOfferDatas,
+    getOfferData
+    
   };
 }
