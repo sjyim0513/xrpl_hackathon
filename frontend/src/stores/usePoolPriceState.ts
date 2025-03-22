@@ -1,7 +1,11 @@
 import { reactive } from "vue";
-import type { PoolState } from "../interfaces/transaction_interface";
+import type { PoolState,  OfferState} from "../interfaces/transaction_interface";
 
-// tokenMaps는 각 토큰(주소)을 key로 하고, 그 안에 각 poolId별 PoolState를 저장하는 객체입니다.
+
+const state = reactive<Record<string, PoolState>>({});
+
+const ReactiveOfferState = reactive<Record<string, OfferState>>({});
+
 const tokenMaps = reactive<Record<string, Record<string, PoolState>>>({});
 
 function createPoolState(): Record<string, PoolState> {
@@ -15,6 +19,7 @@ export function getOrCreateTokenMap(key: string): Record<string, PoolState> {
   }
   return tokenMaps[key];
 }
+
 
 export function usePoolPriceState() {
   // token: 토큰(주소) 키, poolId: 각 풀을 구분하는 식별자
@@ -78,8 +83,41 @@ export function usePoolPriceState() {
     });
   }
 
+  function addOfferDatas(poolId: string, tx: any, date: string, info: any) {
+  
+    const offerId = info.keyType + info.offerSequence
+
+    if (info.keyType == "offerCreate") {
+      ReactiveOfferState[offerId].takerpay.push(info.takerpay)
+      ReactiveOfferState[offerId].takerget.push(info.takerget)
+      ReactiveOfferState[offerId].acount = info.acount
+    };
+    
+    
+
+    const beforePrice = getBeforePrice(poolId)
+    const value = [
+    beforePrice,
+    beforePrice + 0.00000000001,
+    beforePrice,
+    beforePrice + 0.00000000001,]
+    
+    
+    state[poolId].categoryDate.push(date);
+    state[poolId].values.push(value);
+    state[poolId].type.push(info.keyType);
+    state[poolId].tx.push(tx);
+    state[poolId].info.push(info);
+    }
+
+  function getOfferData(offerId: string) {
+    return ReactiveOfferState[offerId]
+  }
+  
+
   function getPoolData(token: string, poolId: string) {
     return getOrCreateTokenMap(token)[poolId];
+
   }
 
   function getStateKeys(token: string): string[] {
@@ -119,6 +157,11 @@ export function usePoolPriceState() {
     getTypes,
     getTxs,
     getInfos,
+
+    addOfferDatas,
+    getOfferData
+    
+
     getOrCreateTokenMap,
   };
 }
