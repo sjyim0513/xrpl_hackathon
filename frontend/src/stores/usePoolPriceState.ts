@@ -17,8 +17,10 @@ function createPoolState(): Record<string, PoolState> {
 // 주어진 토큰(key)이 없으면 새 객체를 만들고, 있으면 기존 객체를 반환합니다.
 export function getOrCreateTokenMap(key: string): Record<string, PoolState> {
   if (!tokenMaps[key]) {
+    console.log("key", key);
     tokenMaps[key] = createPoolState();
   }
+  console.log("tokenMaps", tokenMaps);
   return tokenMaps[key];
 }
 
@@ -61,6 +63,7 @@ export function usePoolPriceState() {
     poolState.type.push(data[2]);
     poolState.tx.push(data[3]);
     poolState.info.push(info);
+    console.log("poolState", poolState, token, poolId);
   }
 
   function addtoAllPoolDatas(data: [string, string, any], info: any) {
