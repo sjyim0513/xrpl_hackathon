@@ -107,11 +107,15 @@ function omitAccount(info: Record<string, any>): Record<string, any> {
   background-color: blue;
 }
 
+.send {
+  background-color: #3f46ff;
+}
+
 .route {
   background-color: purple;
 }
 
 .trustLine {
-  background-color: orange;
+  background-color: #d482ff;
 }
 </style>

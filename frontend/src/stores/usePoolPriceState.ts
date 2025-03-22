@@ -2,6 +2,18 @@ import { reactive } from "vue";
 import type { PoolState } from "../interfaces/transaction_interface";
 
 const state = reactive<Record<string, PoolState>>({});
+const tokenMaps = reactive<Record<string, Record<string, PoolState>>>({});
+
+function createPoolState(): Record<string, PoolState> {
+  return reactive<Record<string, PoolState>>({});
+}
+
+export function getOrCreateTokenMap(key: string): Record<string, PoolState> {
+  if (!tokenMaps[key]) {
+    tokenMaps[key] = createPoolState();
+  }
+  return tokenMaps[key];
+}
 
 export function usePoolPriceState() {
   function initializePool(poolId: string) {
@@ -67,6 +79,12 @@ export function usePoolPriceState() {
     return state[poolId];
   }
 
+  function getStateKeys(): string[] {
+    const keys = Object.keys(state);
+    console.log("State keys:", keys);
+    return keys;
+  }
+
   function getValues(poolId: string) {
     return state[poolId].values;
   }
@@ -99,5 +117,6 @@ export function usePoolPriceState() {
     getTypes,
     getTxs,
     getInfos,
+    getOrCreateTokenMap,
   };
 }
