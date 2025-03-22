@@ -911,16 +911,18 @@ function updateChart() {
         color0: "#3F46FF",
         borderWidth: 0,
       };
-    } else if (
-      candleType === "route" ||
-      candleType === "trustLine" ||
-      candleType === "offer"
-    ) {
-      itemStyle = {
-        color: "#000000",
-        color0: "#000000",
-        borderWidth: 0,
-      };
+    } else if (candleType === "route" ) {
+      //루트 색상
+    
+    } else if (candleType === "trustLine") {
+    itemStyle = {
+      color: "#D482FF",  
+      color0: "#D482FF",
+      borderWidth: 0,
+    };
+    } else if (candleType === "offer") {
+      //오퍼 색상
+      
     } else {
       if (candle[0] <= candle[1]) {
         // 상승
