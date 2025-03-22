@@ -78,26 +78,25 @@ let chart: echarts.ECharts;
 let originalColoredData: any[] = [];
 let globalColoredData: any[] = [];
 
-function calculatePoolId(tokenAdd: { value: string }, offer: any): string {
+function calculatePoolId(tokenAddress: string , takerget: any, takerpay: any): string {
   // takerget가 객체 형태인 경우 처리'
-  console.log("offer", offer);
+ 
   if (
-    typeof offer.takerget !== "string" &&
-    offer.takerget.issuer !== tokenAdd.value
+    typeof takerget !== "string" &&
+    takerget.issuer !== tokenAddress
   ) {
-    if (offer.takerget.issuer !== tokenAdd.value) {
-      return offer.takerget.issuer + offer.takerget.currency;
-    }
+    
+      return takerget.currency + '_' + takerget.issuer;
   }
 
   // takerpay가 객체 형태인 경우 처리
   if (
-    typeof offer.takerpay !== "string" &&
-    offer.takerget.issuer !== tokenAdd.value
+    typeof takerpay !== "string" &&
+    takerpay.issuer !== tokenAddress
   ) {
-    if (offer.takerpay.issuer !== tokenAdd.value) {
-      return offer.takerpay.issuer + offer.takerpay.currency;
-    }
+    
+      return takerpay.currency + '_' + takerpay.issuer;
+
   }
 
   // 두 필드 모두 문자열인 경우 poolId를 "xrp"로 설정
@@ -105,7 +104,7 @@ function calculatePoolId(tokenAdd: { value: string }, offer: any): string {
 }
 
 function isNotExistingOfferCreate(offerSequence: any) {
-  const offerId = "OfferCreate" + offerSequence;
+  const offerId =  offerSequence;
   try {
     getOfferData(offerId);
     return false;
@@ -115,9 +114,11 @@ function isNotExistingOfferCreate(offerSequence: any) {
 }
 
 function getPoolId(offerSequence: any) {
-  const offerId = "OfferCreate" + offerSequence;
+  const offerId = offerSequence;
   const originalOffer = getOfferData(offerId);
-  return calculatePoolId(tokenAdd, originalOffer);
+  const takerget = originalOffer.takerget
+  const takerpay = originalOffer.takerpay
+  return calculatePoolId(tokenAdd.value, takerget, takerpay);
 }
 
 // state의 key들을 computed로 만듭니다.
@@ -241,10 +242,11 @@ function parseTx(tx: any) {
   // 공통 필드 처리 (수수료는 XRPL 단위로 10^6 나누기)
   const fee = Number(txJson.fee) / 1000000;
   const account = txJson.account;
-  const offerSequence = Number(txJson.sequence);
+  
 
   // TransactionType에 따른 분기 처리
   if (txJson.TransactionType === "OfferCreate") {
+    const offerSequence = Number(txJson.sequence);
     // TakerGets 처리: 문자열이면 XRPL 단위, 객체이면 currency, issuer, value 필드 변환
     let takerget: string | { currency: string; issuer: string; value: string };
     if (typeof txJson.TakerGets === "string") {
@@ -253,7 +255,7 @@ function parseTx(tx: any) {
       takerget = {
         currency: txJson.TakerGets.currency,
         issuer: txJson.TakerGets.issuer,
-        value: (txJson.TakerGets.value / 1000000).toString(),
+        value: txJson.TakerGets.value,
       };
     }
 
@@ -265,7 +267,7 @@ function parseTx(tx: any) {
       takerpay = {
         currency: txJson.TakerPays.currency,
         issuer: txJson.TakerPays.issuer,
-        value: (txJson.TakerPays.value / 1000000).toString(),
+        value: txJson.TakerPays.value,
       };
     }
 
@@ -278,6 +280,7 @@ function parseTx(tx: any) {
       takerget,
     };
   } else if (txJson.TransactionType === "OfferCancel") {
+    const offerSequence = txJson.OfferSequence
     // OfferCancel의 경우 추가 데이터(tx_json.date, tx_json.OfferSequence 등)는 별도 처리가 가능하나,
     // 인터페이스에 정의된 keyType, offerSequence, account, fee만 info 객체에 포함합니다.
     return {
@@ -370,7 +373,7 @@ async function fetchAndProcessTx() {
     updateChart();
     await client.disconnect();
   } catch (e) {
-    console.log(e);
+    console.log(e, "오류 오류 ");
     alert("트랜잭션 조회 중 오류 발생");
   } finally {
     chart.hideLoading();
@@ -801,7 +804,9 @@ async function formatData(txs: any[]) {
       } else if (type == "OfferCreate") {
         const categoryData = formatDate(tx.tx_json.date);
         const info = parseTx(tx);
-        const poolId = calculatePoolId(tokenAdd, info);
+        const takerget = info.takerget
+        const takerpay = info.takerpay
+        const poolId = calculatePoolId(tokenAdd.value, takerget, takerpay);
         addOfferDatas(tokenAdd.value, poolId, tx, categoryData, info);
       }
     } catch (e) {

@@ -4,7 +4,6 @@ import type {
   OfferState,
 } from "../interfaces/transaction_interface";
 
-const state = reactive<Record<string, PoolState>>({});
 
 const ReactiveOfferState = reactive<Record<string, OfferState>>({});
 
@@ -91,7 +90,8 @@ export function usePoolPriceState() {
     date: string,
     info: any
   ) {
-    const offerId = info.keyType + info.offerSequence;
+    const offerId = info.offerSequence;
+    console.log(offerId)
 
     if (info.keyType == "offerCreate") {
       ReactiveOfferState[offerId].takerpay.push(info.takerpay);
