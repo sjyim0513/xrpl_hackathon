@@ -322,6 +322,7 @@ async function fetchAndProcessTx() {
   try {
     await client.connect();
     const account = tokenAdd.value;
+
     const inputState = getPoolData(tokenAdd.value, account);
     const storedTxs = inputState ? inputState.tx : [];
     if (storedTxs.length > 0) {
@@ -624,9 +625,9 @@ async function formataData_multy(txs: any[]) {
           //xrp를 보내고 토큰을 받음 (buy)
           if (typeof tx_json?.SendMax === "string") {
             if (meta.delivered_amount.issuer === tokenAdd.value) {
-              const tokenMap = getOrCreateTokenMap(
-                meta.delivered_amount.currency
-              );
+              // const tokenMap = getOrCreateTokenMap(
+              //   meta.delivered_amount.currency
+              // );
               // console.dir("tokenMap", tokenMap);
               makedataset(tx, true, true);
 
@@ -726,9 +727,9 @@ async function formatData(txs: any[]) {
           //xrp를 보내고 토큰을 받음 (buy)
           if (typeof tx_json?.SendMax === "string") {
             if (meta.delivered_amount.issuer === tokenAdd.value) {
-              const tokenMap = getOrCreateTokenMap(
-                meta.delivered_amount.currency
-              );
+              // const tokenMap = getOrCreateTokenMap(
+              //   meta.delivered_amount.currency
+              // );
               makedataset(tx, true, true);
 
               // console.log("xrp로 구매");
@@ -1394,7 +1395,13 @@ function updateChart(selected: string) {
   }
   const correspondingOriginalKey = stateKeys.value.originalKeys[index];
   const txdata = getPoolData(tokenAdd.value, correspondingOriginalKey);
-  console.log(poolList.value, tokenAdd.value);
+  console.log(
+    poolList.value,
+    tokenAdd.value,
+    selected,
+    correspondingOriginalKey,
+    txdata
+  );
   originalColoredData = txdata.values.map((candle: number[], i: number) => {
     const candleType = txdata.info[i].keyType;
     let itemStyle = {};
