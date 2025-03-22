@@ -366,6 +366,30 @@ async function formatData(txs: any[]) {
           addtoAllPoolDatas([categoryData, type, tx], info);
         }
       } else if (type == "TrustSet") {
+        
+        
+        
+        const categoryData = formatDate(tx.tx_json.date);
+
+        const keyType = "trustLine";
+        const account = tx.tx_json.Account;
+        const fee = tx.tx_json.Fee / 1000000;
+
+        let amount = "";
+        if (tx.tx_json.LimitAmount && tx.tx_json.LimitAmount.value) {
+          amount = tx.tx_json.LimitAmount.value;
+        }
+
+        const info = {
+          keyType,
+          account,
+          fee,
+          amount,
+        };
+
+        addtoAllPoolDatas([categoryData, type, tx], info);
+
+        
         //price는 beforePrice에 있음
         //모든 pool 배열에 저장
       } else if (type == "OfferCancel" || type == "OfferCreate") {
