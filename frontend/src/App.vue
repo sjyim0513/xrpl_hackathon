@@ -17,7 +17,7 @@
   <div class="tokenlist-container">
     <div class="tokenlist">
       <div class="from">{{ currency }}</div>
-      <span style="color: #cecece; margin: 0 10px 0 10px"></span>
+      <span class="slash"> / </span>
       <div class="to">
         <v-select
           v-model="poolList"
@@ -28,12 +28,27 @@
           append-icon=""
           class="no-border-select center-text-select"
           @update:modelValue="updateChart"
-        ></v-select>
+        />
+      </div>
+      <div class="limit">
+        <div class="input-group">
+          <label>Ledger Min:</label>
+          <input type="number" v-model.number="ledgerMin" />
+        </div>
+        <div class="input-group">
+          <label>Ledger Max:</label>
+          <input type="number" v-model.number="ledgerMax" />
+        </div>
+        <div class="input-group">
+          <label>Limit:</label>
+          <input type="number" v-model.number="limit" />
+        </div>
       </div>
     </div>
   </div>
   <div class="main-container">
-    <div class="chart" ref="chartDom" style="width: 75%; height: 90vh"></div>
+    <div class="chart" ref="chartDom" style="width: 80%; height: 80vh"></div>
+
     <TransactionCard :transactions="selectedTransactions" />
   </div>
 </template>
@@ -60,6 +75,7 @@ const {
   getOfferData,
   addOfferDatas,
   getOrCreateTokenMap,
+  resetAllTokenData,
 } = usePoolPriceState();
 
 // const client = new Client("wss://s1.ripple.com/");
@@ -310,7 +326,7 @@ async function fetchAndProcessTx() {
     text: "데이터 로딩중...",
     textColor: "#FAF9F6",
     color: "#FAF9F6",
-    maskColor: "rgba(0, 0, 0, 0.5)",
+    maskColor: "rgba(0, 0, 0, 0)",
     zlevel: 0,
   });
 
@@ -318,14 +334,16 @@ async function fetchAndProcessTx() {
     await client.connect();
     const account = tokenAdd.value;
 
-    const inputState = getPoolData(tokenAdd.value, account);
-    const storedTxs = inputState ? inputState.tx : [];
-    if (storedTxs.length > 0) {
-      const latestTx = storedTxs[storedTxs.length - 1];
-      ledgerMin.value = latestTx.tx_json.ledger_index + 1;
-    } else {
-      ledgerMin.value = -1;
-    }
+    resetAllTokenData();
+    // const inputState = getPoolData(tokenAdd.value, account);
+    // console.log("inputState", inputState);
+    // const storedTxs = inputState ? inputState.tx : [];
+    // if (storedTxs.length > 0) {
+    //   const latestTx = storedTxs[storedTxs.length - 1];
+    //   ledgerMin.value = latestTx.tx_json.ledger_index + 1;
+    // } else {
+    //   ledgerMin.value = -1;
+    // }
 
     let allTxs: any[] = [];
     if (limit.value === 0) {
@@ -371,10 +389,8 @@ async function fetchAndProcessTx() {
     if (obligations && Object.keys(obligations).length === 1) {
       const currencyHex = Object.keys(obligations)[0];
       currency.value = decode(currencyHex);
-      console.log("currency.value", currency.value);
       await formatData(allTxs);
     } else {
-      console.log("???????????????????????");
       await formataData_multy(allTxs);
     }
     updateChart("XRP");
@@ -592,7 +608,6 @@ function makedataset(tx: any, isXRP: boolean, isBuy: boolean) {
           offerSequence: sequences,
           offerAmount: amounts,
         };
-        console.log("tokenAdd.value_buy", tokenAdd.value, poolId, tx);
         addPoolData(
           tokenAdd.value,
           poolId,
@@ -923,14 +938,14 @@ onMounted(() => {
       {
         left: "8%",
         right: "5%",
-        height: "70%", // 메인 차트 영역을 60%로 늘림
+        height: "65%", // 메인 차트 영역을 60%로 늘림
         backgroundColor: "#111111",
       },
       {
         left: "8%",
         right: "5%",
         top: "20%", // 보조 차트 영역의 위치도 약간 조정
-        height: "50%", // 보조 영역을 20%로 늘림
+        height: "40%", // 보조 영역을 20%로 늘림
         backgroundColor: "#111111",
       },
     ],
@@ -1312,7 +1327,9 @@ onMounted(() => {
       selectedTransactions.value = [];
       globalColoredData = originalColoredData.map((d) => ({ ...d }));
     } else {
-      selectedTransactions.value = [clicked];
+      selectedTransactions.value = globalColoredData.filter(
+        (dataPoint) => dataPoint.account === clickedAccount
+      );
 
       globalColoredData = originalColoredData.map((dataPoint) => {
         const sameAccount = dataPoint.account == clickedAccount;
@@ -1579,6 +1596,7 @@ window.addEventListener("resize", () => {
 
 .search-input {
   padding: 10px;
+  width: 400px;
   margin-right: 10px;
   border-radius: 20px;
   border: 1px solid #00000070;
@@ -1591,7 +1609,7 @@ window.addEventListener("resize", () => {
   padding: 12px 20px;
   border-radius: 30px;
   background: linear-gradient(135deg, #02871489, #00000057);
-  color: rgb(0, 0, 0);
+  color: #cecece;
   border: 1px solid #00000070;
   font-weight: bold;
   box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.5);
@@ -1631,12 +1649,21 @@ window.addEventListener("resize", () => {
 
 .tokenlist {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  width: 100%;
-  color: #811313;
+  align-items: center; /* 수직 가운데 정렬 */
+  justify-content: flex-start; /* 기본은 flex-start, 이후 .limit에 margin-left: auto가 적용됨 */
+  width: 100%; /* 전체 너비 사용 */
+  border-radius: 10px 10px 0 0;
+  color: #cecece;
   font-size: 20px;
   gap: 5px;
+  background-color: #111111;
+  padding: 10px 20px; /* 패딩 추가하여 내부 여백 확보 */
+}
+
+.limit {
+  margin-left: auto; /* 오른쪽 끝으로 밀어냄 */
+  display: flex;
+  gap: 15px; /* 요소 간 간격 */
 }
 
 .from,
@@ -1645,6 +1672,11 @@ window.addEventListener("resize", () => {
   background: rgba(255, 255, 255, 0.2);
   border-radius: 10px;
   font-weight: bold;
+  margin-bottom: 20px;
+}
+
+.center-text-select .v-field__input {
+  text-align: center;
 }
 
 .from,
@@ -1662,11 +1694,28 @@ window.addEventListener("resize", () => {
 .main-container {
   display: flex;
   justify-content: space-between;
-  margin-top: 30px;
+  /* margin-top: 30px; */
   border-radius: 15px;
   background: linear-gradient(90deg, #13829e00, #0c5b8500);
-  padding: 20px;
+  padding: 0 20px 0 20px;
   box-shadow: 0px 4px 5px rgba(0, 0, 0, 0.5);
+}
+
+.slash {
+  color: #cecece;
+  /* margin: 0 10px 0 10px; */
+  display: flex;
+  align-items: center;
+  padding-top: 5px;
+}
+
+.input-group {
+  gap: 10px;
+}
+
+.number {
+  background: #cecece;
+  border-radius: 10px;
 }
 
 .chart {
