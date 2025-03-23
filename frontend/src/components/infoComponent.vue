@@ -22,10 +22,10 @@ const props = defineProps<{
 <style>
 .item-Contaier {
   display: flex;
-  padding: 15px;
+  padding: 5px;
   background-color: #181818;
-  border-radius: 15px;
-  margin: 20px 10px 10px 10px;
+  border-radius: 10px;
+  margin: 10px 10px 10px 10px;
   align-content: center;
 }
 

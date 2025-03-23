@@ -41,7 +41,6 @@ const props = defineProps<{
 
 const effectiveTransactions = computed(() => {
   if (props.transactions && props.transactions.length > 0) {
-    console.log("props", props.transactions);
     return props.transactions;
   } else {
     return [
@@ -65,7 +64,7 @@ function omitAccount(info: Record<string, any>): Record<string, any> {
 <style>
 .card-container {
   margin-left: 0px;
-  margin-top: -170px; /* 위로 올리기 */
+
   background: linear-gradient(90deg, #11111100, #0c5a8522);
   border-radius: 15px;
   transition: transform 0.3s ease;

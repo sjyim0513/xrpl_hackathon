@@ -20,7 +20,6 @@ export function getOrCreateTokenMap(key: string): Record<string, PoolState> {
     console.log("key", key);
     tokenMaps[key] = createPoolState();
   }
-  console.log("tokenMaps", tokenMaps);
   return tokenMaps[key];
 }
 
@@ -38,6 +37,11 @@ export function usePoolPriceState() {
         info: [],
       };
     }
+  }
+
+  function resetTokenData(token: string) {
+    // 기존 토큰의 데이터 초기화
+    tokenMaps[token] = createPoolState();
   }
 
   function getBeforePrice(token: string, poolId: string): number {
@@ -117,6 +121,12 @@ export function usePoolPriceState() {
     poolState.info.push(info);
   }
 
+  function resetAllTokenData() {
+    Object.keys(tokenMaps).forEach((key) => {
+      tokenMaps[key] = createPoolState();
+    });
+  }
+
   function getOfferData(offerId: string) {
     return ReactiveOfferState[offerId];
   }
@@ -165,5 +175,7 @@ export function usePoolPriceState() {
     addOfferDatas,
     getOfferData,
     getOrCreateTokenMap,
+    resetTokenData,
+    resetAllTokenData,
   };
 }
