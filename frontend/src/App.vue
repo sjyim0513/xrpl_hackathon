@@ -33,15 +33,15 @@
       <div class="limit">
         <div class="input-group">
           <label>Ledger Min:</label>
-          <input type="number" v-model.number="ledgerMin" />
+          <input class="inputs" type="number" v-model.number="ledgerMin" />
         </div>
         <div class="input-group">
-          <label>Ledger Max:</label>
-          <input type="number" v-model.number="ledgerMax" />
+          <label class="labels">Ledger Max:</label>
+          <input class="inputs" type="inputs" v-model.number="ledgerMax" />
         </div>
         <div class="input-group">
           <label>Limit:</label>
-          <input type="number" v-model.number="limit" />
+          <input class="inputs" type="inputs" v-model.number="limit" />
         </div>
       </div>
     </div>
@@ -84,7 +84,7 @@ const client = new Client(
 );
 const tokenAdd = ref("");
 
-const limit = ref(1000);
+const limit = ref(10000);
 const currency = ref("");
 const ledgerMin = ref(-1);
 const ledgerMax = ref(-1);
@@ -346,7 +346,8 @@ async function fetchAndProcessTx() {
     // }
 
     let allTxs: any[] = [];
-    if (limit.value === 0) {
+    const key = 1;
+    if (key == 1) {
       let marker: string | undefined = undefined;
       do {
         const request: AccountTxRequest = {
@@ -361,6 +362,7 @@ async function fetchAndProcessTx() {
         const response = await client.request(request);
         const txs = response.result.transactions;
         allTxs = allTxs.concat(txs);
+        console.log("allTxs.len", allTxs.length);
         marker = response.result.marker as string | undefined;
       } while (marker);
     } else {
@@ -1663,6 +1665,7 @@ window.addEventListener("resize", () => {
 .limit {
   margin-left: auto; /* 오른쪽 끝으로 밀어냄 */
   display: flex;
+  align-items: center;
   gap: 15px; /* 요소 간 간격 */
 }
 
@@ -1672,7 +1675,6 @@ window.addEventListener("resize", () => {
   background: rgba(255, 255, 255, 0.2);
   border-radius: 10px;
   font-weight: bold;
-  margin-bottom: 20px;
 }
 
 .center-text-select .v-field__input {
@@ -1710,12 +1712,18 @@ window.addEventListener("resize", () => {
 }
 
 .input-group {
-  gap: 10px;
 }
 
-.number {
-  background: #cecece;
+.labels {
+  font-size: 18px;
+}
+
+.inputs {
+  width: 50px;
+  color: #cecece;
   border-radius: 10px;
+  background: #2b2b2b;
+  margin-left: 10px;
 }
 
 .chart {
