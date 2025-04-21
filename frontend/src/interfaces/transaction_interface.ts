@@ -114,8 +114,8 @@ export interface payment {
   fee: number;
   sendAmount: number;
   deliveredAmount: number;
-  offerSequence: number[] | null;
-  offerAmount: number[] | null;
+  // offerSequence: number[] | null;
+  // offerAmount: number[] | null;
 }
 
 export interface send {
