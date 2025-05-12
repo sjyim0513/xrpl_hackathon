@@ -3,6 +3,9 @@ import {
   PublicKey,
   type ConfirmedSignatureInfo,
 } from "@solana/web3.js";
+import { usePoolPriceState } from "../stores/usePoolState";
+
+const store = usePoolPriceState();
 
 export interface ChainModule {
   fetchAndProcessTx: (
@@ -22,6 +25,31 @@ function formatDate(date: number): string {
   const minutes = String(d.getMinutes()).padStart(2, "0");
   const seconds = String(d.getSeconds()).padStart(2, "0");
   return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+}
+
+function classifyTxs(txs: any[]) {
+  const TOKEN_PROGRAM = new PublicKey(
+    "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+  );
+  const DEX_PROGRAMS = [
+    new PublicKey("routeUGWgWzqBWFcrCfv8tritsqukccJPu3q5GPP3xS"),
+    new PublicKey("675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8"),
+  ];
+
+  txs.forEach((tx) => {
+    if (!tx.meta) return null;
+
+    const inst = tx.transaction.message.instructions as any[];
+
+    const innerInst = (tx.meta.innerInstructions || []).flatMap(
+      (entry: { instructions: any[] }) => entry.instructions as any[]
+    );
+
+    // 3) 모두 합치기
+    const allIxs = [...inst, ...innerInst];
+
+    console.dir(allIxs, { depth: null });
+  });
 }
 
 export const solModule: ChainModule = {
@@ -72,6 +100,8 @@ export const solModule: ChainModule = {
       }
 
       console.dir(transactions);
+
+      classifyTxs(transactions);
     } catch (e) {
       console.error("error", e);
     }

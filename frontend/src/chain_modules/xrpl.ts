@@ -8,6 +8,9 @@ import type {
   TokenInfo,
 } from "../interfaces/transaction_interface";
 
+const store = usePoolPriceState();
+const chainId = 1440002;
+
 export interface ChainModule {
   fetchAndProcessTx: (
     tokenAdd: string,
@@ -63,7 +66,10 @@ function makedataset(
           console.log("ModifiedNode 없음", tx);
           return;
         }
-        const getCandleData = (open: any, close: any) => [
+        const getCandleData = (
+          open: any,
+          close: any
+        ): [number, number, number, number] => [
           open,
           close,
           Math.min(open, close),
@@ -78,13 +84,13 @@ function makedataset(
         const effectiveRate = sendAmount / deliveredAmount;
         const poolId = "XRP";
         const beforePrice =
-          getBeforePrice(tokenAdd, poolId) == 0
+          store.getBeforePrice(chainId, tokenAdd, poolId) == 0
             ? effectiveRate
-            : getBeforePrice(tokenAdd, poolId);
+            : store.getBeforePrice(chainId, tokenAdd, poolId);
         const value = getCandleData(beforePrice, effectiveRate);
         const type = tx.tx_json.TransactionType;
 
-        setBeforePrice(tokenAdd, poolId, effectiveRate);
+        store.setBeforePrice(chainId, tokenAdd, poolId, effectiveRate);
 
         const info: payment = {
           keyType: "buy",
@@ -95,7 +101,13 @@ function makedataset(
           // offerSequence: sequences,
           // offerAmount: amounts,
         };
-        addPoolData(tokenAdd, poolId, [categoryData, value, type, tx], info);
+        store.addCandle(
+          chainId,
+          tokenAdd,
+          poolId,
+          [categoryData, value, type, tx],
+          info
+        );
       } else {
         //이 토큰으로 xrp를 구매한 경우
         const nodeWrapper = tx.meta.AffectedNodes?.find((node: any) => {
@@ -125,10 +137,13 @@ function makedataset(
         const effectiveRate = deliveredAmount / Math.abs(sendAmount);
         const poolId = "XRP";
         const beforePrice =
-          getBeforePrice(tokenAdd, poolId) == 0
+          store.getBeforePrice(chainId, tokenAdd, poolId) == 0
             ? effectiveRate
-            : getBeforePrice(tokenAdd, poolId);
-        const getCandleData = (open: any, close: any) => [
+            : store.getBeforePrice(chainId, tokenAdd, poolId);
+        const getCandleData = (
+          open: any,
+          close: any
+        ): [number, number, number, number] => [
           open,
           close,
           Math.min(open, close),
@@ -137,7 +152,7 @@ function makedataset(
         const value = getCandleData(beforePrice, effectiveRate);
         const type = tx.tx_json.TransactionType;
 
-        setBeforePrice(tokenAdd, poolId, effectiveRate);
+        store.setBeforePrice(chainId, tokenAdd, poolId, effectiveRate);
 
         const info: payment = {
           keyType: "sell",
@@ -148,7 +163,13 @@ function makedataset(
           // offerSequence: sequences,
           // offerAmount: amounts,
         };
-        addPoolData(tokenAdd, poolId, [categoryData, value, type, tx], info);
+        store.addCandle(
+          chainId,
+          tokenAdd,
+          poolId,
+          [categoryData, value, type, tx],
+          info
+        );
       }
     } else {
       //이 token으로 다른 토큰을 구매한 경우
@@ -177,13 +198,18 @@ function makedataset(
         const poolId = `${tx.tx_json.SendMax.currency}_${tx.tx_json.SendMax.issuer}`;
 
         const beforePrice =
-          getBeforePrice(tokenAdd, poolId) == 0
+          store.getBeforePrice(chainId, tokenAdd, poolId) == 0
             ? effectiveRate
-            : getBeforePrice(tokenAdd, poolId);
-        const value = [beforePrice, effectiveRate, effectiveRate, beforePrice];
+            : store.getBeforePrice(chainId, tokenAdd, poolId);
+        const value: [number, number, number, number] = [
+          beforePrice,
+          effectiveRate,
+          effectiveRate,
+          beforePrice,
+        ];
         const type = tx.tx_json.TransactionType;
 
-        setBeforePrice(tokenAdd, poolId, effectiveRate);
+        store.setBeforePrice(chainId, tokenAdd, poolId, effectiveRate);
 
         const info: payment = {
           keyType: "sell",
@@ -195,7 +221,13 @@ function makedataset(
           // offerAmount: amounts,
         };
         console.log("tokenAdd.value_sell", tokenAdd, poolId, tx);
-        addPoolData(tokenAdd, poolId, [categoryData, value, type, tx], info);
+        store.addCandle(
+          chainId,
+          tokenAdd,
+          poolId,
+          [categoryData, value, type, tx],
+          info
+        );
       } else {
         //다른 토큰을 판매하고 이 토큰을 얻은 경우
         const nodeWrapper = tx.meta.AffectedNodes?.find((node: any) => {
@@ -227,12 +259,17 @@ function makedataset(
         const effectiveRate = Math.abs(sendAmount) / deliveredAmount;
         const poolId = `${tx.meta.delivered_amount.currency}_${tx.meta.delivered_amount.issuer}`;
         const beforePrice =
-          getBeforePrice(tokenAdd, poolId) == 0
+          store.getBeforePrice(chainId, tokenAdd, poolId) == 0
             ? effectiveRate
-            : getBeforePrice(tokenAdd, poolId);
-        const value = [beforePrice, effectiveRate, beforePrice, effectiveRate];
+            : store.getBeforePrice(chainId, tokenAdd, poolId);
+        const value: [number, number, number, number] = [
+          beforePrice,
+          effectiveRate,
+          beforePrice,
+          effectiveRate,
+        ];
         const type = tx.tx_json.TransactionType;
-        setBeforePrice(tokenAdd, poolId, effectiveRate);
+        store.setBeforePrice(chainId, tokenAdd, poolId, effectiveRate);
         const info: payment = {
           keyType: "buy",
           account: tx.tx_json.Account,
@@ -242,7 +279,13 @@ function makedataset(
           // offerSequence: sequences,
           // offerAmount: amounts,
         };
-        addPoolData(tokenAdd, poolId, [categoryData, value, type, tx], info);
+        store.addCandle(
+          chainId,
+          tokenAdd,
+          poolId,
+          [categoryData, value, type, tx],
+          info
+        );
       }
     }
   } catch (e) {
@@ -274,8 +317,12 @@ async function formatData(tokenAdd: string, txs: any[]) {
               // console.log("xrp를 보냈는데 받은 토큰이 tokenAddress가 아님: ");
               const categoryData = formatDate(tx.tx_json.date);
               const poolId = `${tx.meta.delivered_amount.currency}_${tx.meta.delivered_amount.issuer}`;
-              const beforePrice = getBeforePrice(tokenAdd, poolId);
-              const value = [
+              const beforePrice = store.getBeforePrice(
+                chainId,
+                tokenAdd,
+                poolId
+              );
+              const value: [number, number, number, number] = [
                 beforePrice,
                 beforePrice,
                 beforePrice,
@@ -286,7 +333,8 @@ async function formatData(tokenAdd: string, txs: any[]) {
                 account: tx.tx_json.Account,
                 fee: tx.tx_json.Fee / 1000000,
               };
-              addPoolData(
+              store.addCandle(
+                chainId,
                 tokenAdd,
                 poolId,
                 [categoryData, value, type, tx],

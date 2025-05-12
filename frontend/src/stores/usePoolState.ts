@@ -28,6 +28,12 @@ export const usePoolPriceState = defineStore("poolPrice", {
     currentChain: (state) => state.chains[state.selectedChainId],
     currentRpcUrl: (state): string =>
       state.chains[state.selectedChainId]?.rpcUrl ?? "",
+    getBeforePrice:
+      (state) =>
+      (chainId: number, tokenAddress: string, poolId: string): number => {
+        const pool = state.chains[chainId]?.tokens[tokenAddress]?.pools[poolId];
+        return pool?.beforePrice ?? 0;
+      },
   },
 
   actions: {
@@ -83,6 +89,17 @@ export const usePoolPriceState = defineStore("poolPrice", {
       poolState.types.push(data[2]);
       poolState.txs.push(data[3]);
       poolState.infos.push(info);
+    },
+
+    setBeforePrice(
+      chainId: number,
+      tokenAddress: string,
+      poolId: string,
+      price: number
+    ) {
+      this.ensurePool(chainId, tokenAddress, poolId);
+      const poolState = this.chains[chainId].tokens[tokenAddress].pools[poolId];
+      poolState.beforePrice = price;
     },
   },
 });
